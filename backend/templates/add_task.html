@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Task</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #e6f3ff 0%, #f0f9ff 100%);
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 25px rgba(0, 0, 0, 0.15);
+        }
+        .btn-primary {
+            background: #2563eb;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            transition: background 0.3s ease;
+        }
+        .btn-primary:hover {
+            background: #1e40af;
+        }
+        .btn-secondary {
+            background: #6b7280;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            transition: background 0.3s ease;
+        }
+        .btn-secondary:hover {
+            background: #4b5563;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mx-auto mt-8 px-4">
+        <div class="card p-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">Add Task</h2>
+            <form method="POST" action="{{ url_for('add_task') }}">
+                <div class="mb-4">
+                    <label for="task-description" class="block text-sm font-medium text-gray-700">Description</label>
+                    <input type="text" class="w-full p-2 border rounded-md" id="task-description" name="description" required placeholder="Enter task description" title="Task description" aria-describedby="task-description-help">
+                    <small id="task-description-help" class="text-gray-500">Task description</small>
+                </div>
+                <div class="mb-4">
+                    <label for="task-priority" class="block text-sm font-medium text-gray-700">Priority</label>
+                    <select class="w-full p-2 border rounded-md" id="task-priority" name="priority" required title="Task priority" aria-describedby="task-priority-help">
+                        <option value="High">High</option>
+                        <option value="Medium">Medium</option>
+                        <option value="Low">Low</option>
+                    </select>
+                    <small id="task-priority-help" class="text-gray-500">Task priority</small>
+                </div>
+                <div class="mb-4">
+                    <label for="task-due-date" class="block text-sm font-medium text-gray-700">Due Date</label>
+                    <input type="date" class="w-full p-2 border rounded-md" id="task-due-date" name="due_date" required title="Task due date" aria-describedby="task-due-date-help">
+                    <small id="task-due-date-help" class="text-gray-500">Task due date</small>
+                </div>
+                <div class="mb-4">
+                    <label for="task-status" class="block text-sm font-medium text-gray-700">Status</label>
+                    <select class="w-full p-2 border rounded-md" id="task-status" name="status" required title="Task status" aria-describedby="task-status-help">
+                        <option value="Pending">Pending</option>
+                        <option value="Completed">Completed</option>
+                    </select>
+                    <small id="task-status-help" class="text-gray-500">Task status</small>
+                </div>
+                <div class="flex gap-4">
+                    <button type="submit" class="btn-primary" title="Add task" aria-label="Add task">Add Task</button>
+                    <a href="{{ url_for('dashboard') }}" class="btn-secondary" title="Cancel adding task" aria-label="Cancel adding task">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,15 @@
+flask==2.3.2
+scikit-learn==1.4.1.post1
+pandas==2.2.1
+numpy==1.26.4
+SpeechRecognition==3.10.0  # Corrected package name (capitalized)
+pyaudio==0.2.14
+flask-cors==4.0.1  # Added for CORS support
+werkzeug==3.0.1
+flask-socketio==5.3.6
+eventlet==0.36.1  
+Flask-Mail==0.9.1 
+schedule==1.1.0 
+reportlab==4.2.2 
+requests==2.28.1 # Added for WhatsApp API
+python-dotenv==0.19.2

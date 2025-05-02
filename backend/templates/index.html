@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Doctor Dashboard (AI-Powered)</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+</head>
+<body class="bg-gray-100 font-roboto">
+    <div class="container mx-auto p-4">
+        <!-- Header -->
+        <header class="bg-indigo-900 text-white p-4 flex justify-between items-center rounded-lg shadow">
+            <div class="logo text-2xl font-bold">HOSPITAL AI SaaS</div>
+            <nav class="space-x-4">
+                <a href="#" class="text-sm uppercase font-semibold border-b-2 border-white">PATIENTS</a>
+                <a href="#" class="text-sm uppercase font-semibold hover:border-b-2 hover:border-white">DOCTOR</a>
+                <a id="user-management-link" href="/user-management" class="text-sm uppercase font-semibold hover:border-b-2 hover:border-white hidden">USER MANAGEMENT</a>
+                <a href="#" class="logout text-sm uppercase font-semibold border border-white px-3 py-1 rounded hover:bg-white hover:text-indigo-900">LOGOUT</a>
+            </nav>
+        </header>
+
+        <!-- Notification Area -->
+        <div id="notification-area" class="mt-4 hidden">
+            <div id="notification-message" class="p-4 rounded-lg text-white"></div>
+        </div>
+
+        <!-- Main Dashboard -->
+        <main class="mt-6">
+            <h1 class="text-3xl font-bold text-gray-800 mb-6">Doctor DASHBOARD (AI-Powered)</h1>
+
+            <!-- Stats Cards -->
+            <div class="stats grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <div class="stat-card bg-white p-4 rounded-lg shadow flex items-center">
+                    <div class="icon text-3xl mr-4">👤</div>
+                    <div class="info">
+                        <p class="text-gray-600">TOTAL PATIENTS</p>
+                        <h2 class="text-2xl font-bold">120</h2>
+                    </div>
+                </div>
+                <div class="stat-card bg-white p-4 rounded-lg shadow flex items-center">
+                    <div class="icon text-3xl mr-4">🔔</div>
+                    <div class="info">
+                        <p class="text-gray-600">Upcoming Appointments</p>
+                        <h2 class="text-2xl font-bold">8</h2>
+                    </div>
+                </div>
+                <div class="stat-card bg-white p-4 rounded-lg shadow flex items-center">
+                    <div class="icon text-3xl mr-4">✅</div>
+                    <div class="info">
+                        <p class="text-gray-600">Completed Appointments</p>
+                        <h2 class="text-2xl font-bold">25</h2>
+                    </div>
+                </div>
+                <div class="stat-card bg-white p-4 rounded-lg shadow flex items-center">
+                    <div class="icon text-3xl mr-4">⏳</div>
+                    <div class="info">
+                        <p class="text-gray-600">Pending Tasks</p>
+                        <h2 class="text-2xl font-bold">5</h2>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="content flex flex-col lg:flex-row gap-6">
+                <!-- Patient List -->
+                <div class="patient-list bg-white p-6 rounded-lg shadow lg:w-2/3">
+                    <h3 class="text-xl font-semibold mb-4">Patient List (AI-Predicted Risk)</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead>
+                                <tr class="bg-gray-200">
+                                    <th class="p-3">NAME</th>
+                                    <th class="p-3">AGE</th>
+                                    <th class="p-3">GENDER</th>
+                                    <th class="p-3">CONDITION</th>
+                                    <th class="p-3">AI RISK LEVEL</th>
+                                    <th class="p-3">ACTIONS</th>
+                                </tr>
+                            </thead>
+                            <tbody id="user-table-body">
+                                <!-- Patients will be dynamically populated -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Right Section -->
+                <div class="right-section lg:w-1/3 space-y-6">
+                    <!-- Calendar -->
+                    <div class="calendar bg-white p-6 rounded-lg shadow">
+                        <h3 class="text-xl font-semibold mb-4">April 2024</h3>
+                        <div class="calendar-header grid grid-cols-7 gap-1 text-center font-semibold">
+                            <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
+                        </div>
+                        <div class="calendar-body grid grid-cols-7 gap-1 text-center mt-2">
+                            <span></span><span></span><span class="p-2 hover:bg-indigo-100 cursor-pointer" onclick="selectDate(1)">1</span>
+                            <span class="p-2 hover:bg-indigo-100 cursor-pointer" onclick="selectDate(2)">2</span>
+                            <span class="p-2 hover:bg-indigo-100 cursor-pointer" onclick="selectDate(3)">3</span>
+                            <span class="p-2 hover:bg-indigo-100 cursor-pointer" onclick="selectDate(4)">4</span>
+                            <span class="p-2 hover:bg-indigo-100 cursor-pointer" onclick="selectDate(5)">5</span>
+                            <span class="p-2 hover:bg-indigo-100 cursor-pointer" onclick="selectDate(6)">6</span>
+                            <span class="p-2 hover:bg-indigo-100 cursor-pointer" onclick="selectDate(7)">7</span>
+                            <span class="p-2 hover:bg-indigo-100 cursor-pointer" onclick="selectDate(8)">8</span>
+                            <span class="p-2 hover:bg-indigo-100 cursor-pointer" onclick="selectDate(9)">9</span>
+                            <span class="p-2 bg-indigo-900 text-white rounded" onclick="selectDate(10)">10</span>
+                            <span class="p-2 hover:bg-indigo-100 cursor-pointer" onclick="selectDate(11)">11</span>
+                            <span class="p-2 hover:bg-indigo-100 cursor-pointer" onclick="selectDate(12)">12</span>
+                            <span class="p-2 hover:bg-indigo-100 cursor-pointer" onclick="selectDate(13)">13</span>
+                            <span class="p-2 hover:bg-indigo-100 cursor-pointer" onclick="selectDate(14)">14</span>
+                            <span class="p-2 hover:bg-indigo-100 cursor-pointer" onclick="selectDate(15)">15</span>
+                            <span class="p-2 hover:bg-indigo-100 cursor-pointer" onclick="selectDate(16)">16</span>
+                            <span class="p-2 hover:bg-indigo-100 cursor-pointer" onclick="selectDate(17)">17</span>
+                            <span class="p-2 hover:bg-indigo-100 cursor-pointer" onclick="selectDate(18)">18</span>
+                            <span class="p-2 hover:bg-indigo-100 cursor-pointer" onclick="selectDate(19)">19</span>
+                            <span class="p-2 hover:bg-indigo-100 cursor-pointer" onclick="selectDate(20)">20</span>
+                            <span class="p-2 hover:bg-indigo-100 cursor-pointer" onclick="selectDate(21)">21</span>
+                            <span class="p-2 hover:bg-indigo-100 cursor-pointer" onclick="selectDate(22)">22</span>
+                            <span class="p-2 hover:bg-indigo-100 cursor-pointer" onclick="selectDate(23)">23</span>
+                            <span class="p-2 hover:bg-indigo-100 cursor-pointer" onclick="selectDate(24)">24</span>
+                            <span class="p-2 hover:bg-indigo-100 cursor-pointer" onclick="selectDate(25)">25</span>
+                            <span class="p-2 hover:bg-indigo-100 cursor-pointer" onclick="selectDate(26)">26</span>
+                            <span class="p-2 hover:bg-indigo-100 cursor-pointer" onclick="selectDate(27)">27</span>
+                            <span class="p-2 hover:bg-indigo-100 cursor-pointer" onclick="selectDate(28)">28</span>
+                            <span class="p-2 hover:bg-indigo-100 cursor-pointer" onclick="selectDate(29)">29</span>
+                            <span class="p-2 hover:bg-indigo-100 cursor-pointer" onclick="selectDate(30)">30</span>
+                            <span></span><span></span><span></span>
+                        </div>
+                        <div id="appointments" class="mt-4">
+                            <h4 class="text-lg font-semibold">Appointments</h4>
+                            <ul id="appointment-list" class="mt-2 space-y-2">
+                                <!-- Appointments will be dynamically populated -->
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Prioritized Tasks -->
+                    <div class="tasks bg-white p-6 rounded-lg shadow">
+                        <h3 class="text-xl font-semibold mb-4">AI-Prioritized Tasks</h3>
+                        <ul id="task-list" class="space-y-2">
+                            <!-- Tasks will be dynamically populated -->
+                        </ul>
+                    </div>
+
+                    <!-- Live Chat -->
+                    <div class="live-chat bg-white p-6 rounded-lg shadow">
+                        <h3 class="text-xl font-semibold mb-4">Live Chat</h3>
+                        <div id="chatbox" class="chatbox h-48 overflow-y-auto border p-4 rounded-lg mb-4"></div>
+                        <div class="chat-input space-y-2">
+                            <div class="flex items-center space-x-2">
+                                <label for="chat-recipient" class="text-gray-700">Send to:</label>
+                                <select id="chat-recipient" class="border p-2 rounded">
+                                    <option value="all">All Users (Public)</option>
+                                    <!-- Users will be dynamically populated -->
+                                </select>
+                            </div>
+                            <div class="flex space-x-2">
+                                <input type="text" id="chat-input" placeholder="Type a message..." class="flex-1 border p-2 rounded">
+                                <button onclick="sendMessage()" class="bg-indigo-900 text-white px-4 py-2 rounded hover:bg-indigo-700">Send</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Voice Command -->
+                    <div class="voice-command bg-white p-6 rounded-lg shadow">
+                        <h3 class="text-xl font-semibold mb-4">Voice Command</h3>
+                        <button onclick="startVoiceCommand()" class="bg-indigo-900 text-white px-4 py-2 rounded hover:bg-indigo-700">🎙️ Voice Command</button>
+                        <div id="voice-chatbox" class="voice-chatbox h-48 overflow-y-auto border p-4 rounded-lg mt-4"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Patient Details Modal -->
+    <div id="patient-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+        <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-lg">
+            <h3 class="text-xl font-semibold mb-4">Patient Details</h3>
+            <div id="patient-details-content">
+                <p><strong>Name:</strong> <span id="modal-patient-name"></span></p>
+                <p><strong>Age:</strong> <span id="modal-patient-age"></span></p>
+                <p><strong>Gender:</strong> <span id="modal-patient-gender"></span></p>
+                <p><strong>Condition:</strong> <span id="modal-patient-condition"></span></p>
+                <p><strong>AI Risk Level:</strong> <span id="modal-patient-risk"></span></p>
+                <p><strong>Medical History:</strong> <span id="modal-patient-history"></span></p>
+                <p><strong>Recent Vitals:</strong> <span id="modal-patient-vitals"></span></p>
+                <p><strong>Contact Info:</strong> <span id="modal-patient-contact"></span></p>
+                <p><strong>Allergies:</strong> <span id="modal-patient-allergies"></span></p>
+                <p><strong>Medications:</strong> <span id="modal-patient-medications"></span></p>
+                <p><strong>Last Visit Date:</strong> <span id="modal-patient-last-visit"></span></p>
+            </div>
+            <button onclick="closeModal()" class="mt-4 bg-indigo-900 text-white px-4 py-2 rounded hover:bg-indigo-700">Close</button>
+        </div>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>

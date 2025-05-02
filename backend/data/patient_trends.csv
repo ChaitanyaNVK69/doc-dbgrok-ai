@@ -1,0 +1,6 @@
+age,gender,heart_rate,blood_pressure,condition,risk_level
+45,M,80,120/80,Hypertension,0.6
+30,F,90,110/70,Diabetes,0.4
+60,M,100,140/90,Heart Disease,0.8
+25,F,85,115/75,None,0.1
+50,M,95,130/85,Hypertension,0.7

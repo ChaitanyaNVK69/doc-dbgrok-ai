@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Doctor Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='lib/fullcalendar/fullcalendar.min.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
+    <script src="{{ url_for('static', filename='lib/fullcalendar/fullcalendar.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #e6f3ff 0%, #f0f9ff 100%);
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 25px rgba(0, 0, 0, 0.15);
+        }
+        .btn-primary {
+            background: #2563eb;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            transition: background 0.3s ease;
+        }
+        .btn-primary:hover {
+            background: #1e40af;
+        }
+        .btn-danger {
+            background: #dc2626;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            transition: background 0.3s ease;
+        }
+        .btn-danger:hover {
+            background: #b91c1c;
+        }
+        .btn-info {
+            background: #0891b2;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            transition: background 0.3s ease;
+        }
+        .btn-info:hover {
+            background: #0e7490;
+        }
+        .modal {
+            background: rgba(0, 0, 0, 0.5);
+        }
+        .modal-content {
+            border-radius: 12px;
+            background: white;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+        .table th, .table td {
+            padding: 12px;
+            vertical-align: middle;
+        }
+        #calendar {
+            
+            max-width: 900px;
+            margin: 20px auto;
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+        .list-group-item {
+            border: none;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            background: #f8fafc;
+            transition: background 0.3s ease;
+        }
+        .list-group-item:hover {
+            background: #e2e8f0;
+        }
+        .alert {
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        canvas {
+            max-height: 200px;
+        }
+        .high-priority {
+            background-color: #ff0000 !important;
+            color: white !important;
+        }
+        .low-priority {
+            background-color: #0000ff !important;
+            color: white !important;
+        }
+    </style>
+</head>
+<body>
+    <nav class="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-4">
+        <div class="container mx-auto flex justify-between items-center">
+            <a class="text-2xl font-bold" href="#">Doctor Dashboard</a>
+            <div>
+                <a class="text-white hover:text-blue-200 transition" href="{{ url_for('logout') }}">Logout</a>
+            </div>
+        </div>
+    </nav>
+    <div class="container mx-auto mt-8 px-4">
+        <!-- Real-Time Notifications -->
+        <div id="realTimeNotifications" class="alert bg-blue-100 text-blue-800 hidden" role="alert" aria-label="Live Notifications">
+            <strong>Live Updates:</strong>
+            <span id="notificationMessage"></span>
+            <button type="button" class="ml-2 text-blue-800 hover:text-blue-600" aria-label="Close" onclick="this.parentElement.classList.add('hidden')">×</button>
+        </div>
+
+        <!-- On-Screen Notifications -->
+        {% if notifications %}
+        <div class="alert bg-yellow-100 text-yellow-800" role="alert" aria-label="Notifications">
+            
+            <strong>Notifications:</strong>
+            <button type="button" class="ml-2 text-yellow-800 hover:text-yellow-600" style="float: right;" aria-label="Close" onclick="this.parentElement.classList.add('hidden')">×</button>
+            <ul class="list-disc pl-5">
+                {% for note in notifications %}
+                <li>{{ note }}</li>
+                {% endfor %}
+            </ul>
+            </div>
+        {% endif %}
+
+        <!-- Overview Section -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="card p-6">
+                <h5 class="text-lg font-semibold text-gray-800">Total Patients</h5>
+                <p class="text-2xl text-blue-600">{{ overview.total_patients }}</p>
+            </div>
+            <div class="card p-6">
+                <h5 class="text-lg font-semibold text-gray-800">Upcoming Appointments</h5>
+                <p class="text-2xl text-blue-600">{{ overview.upcoming_appointments }}</p>
+            </div>
+            <div class="card p-6">
+                <h5 class="text-lg font-semibold text-gray-800">Completed Appointments</h5>
+                <p class="text-2xl text-blue-600">{{ overview.completed_appointments }}</p>
+            </div>
+            <div class="card p-6">
+                <h5 class="text-lg font-semibold text-gray-800">Pending Tasks</h5>
+                <p class="text-2xl text-blue-600">{{ overview.pending_tasks }}</p>
+            </div>
+        </div>
+
+              <!-- Analytics Section -->
+              <div class="card mb-8 p-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">Analytics</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-700">Patient Age Distribution</h3>
+                        <canvas id="ageChart" role="img" aria-label="Patient Age Distribution Chart"></canvas>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-700">Patient Conditions</h3>
+                        <canvas id="conditionChart" role="img" aria-label="Patient Conditions Chart"></canvas>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-700">Appointment Status</h3>
+                        <canvas id="appointmentChart" role="img" aria-label="Appointment Status Chart"></canvas>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-700">Task Completion</h3>
+                        <canvas id="taskChart" role="img" aria-label="Task Completion Chart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+        <!-- Patients -->
+        <div class="card mb-8 p-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">Patients</h2>
+            <div class="flex flex-wrap gap-4 mb-4">
+                <button type="button" class="btn-primary" onclick="window.location.href='{{ url_for('add_patient') }}'" title="Add a new patient" aria-label="Add a new patient">Add Patient</button>
+                <button type="button" id="bulkDeleteBtn" class="btn-danger" title="Delete selected patients" aria-label="Delete selected patients">Delete Selected</button>
+                <button type="button" class="btn-info" data-bs-toggle="modal" data-bs-target="#advancedSearchModal" title="Open advanced search" aria-label="Open advanced search">Advanced Search</button>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full table-auto">
+                    <thead>
+                        <tr class="bg-gray-100 text-gray-700">
+                            <th class="p-3"><input type="checkbox" id="selectAll" aria-label="Select all patients"></th>
+                            <th class="p-3">Name</th>
+                            <th class="p-3">Age</th>
+                            <th class="p-3">Gender</th>
+                            <th class เล่ป-3">Condition</th>
+                            <th class="p-3">AI Risk Level</th>
+                            <th class="p-3">Contact</th>
+                            <th class="p-3">Last Visit</th>
+                            <th class="p-3">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for patient in patients %}
+                        <tr class="border-b">
+                            <td class="p-3"><input type="checkbox" class="patient-checkbox" value="{{ patient.id }}" aria-label="Select patient {{ patient.name }}"></td>
+                            <td class="p-3">{{ patient.name }}</td>
+                            <td class="p-3">{{ patient.age }}</td>
+                            <td class="p-3">{{ patient.gender }}</td>
+                            <td class="p-3">{{ patient.condition }}</td>
+                            <td class="p-3">{{ patient.risk_level }}</td>
+                            <td class="p-3">{{ patient.contact_info }}</td>
+                            <td class="p-3">{{ patient.last_visit }}</td>
+                            <td class="p-3 flex gap-2">
+                                <a href="{{ url_for('edit_patient', id=patient.id) }}" class="btn-primary text-sm" title="Edit patient {{ patient.name }}" aria-label="Edit patient {{ patient.name }}">Edit</a>
+                                <a href="{{ url_for('delete_patient', id=patient.id) }}" class="btn-danger text-sm" onclick="return confirm('Are you sure?')" title="Delete patient {{ patient.name }}" aria-label="Delete patient {{ patient.name }}">Delete</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Calendar and Appointments -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 mb-8"> 
+            <div class="card p-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">Calendar</h2>
+                <div id="today-date" class="text-lg font-semibold text-gray-700 mb-2"></div>
+                <div id="calendar" role="region" aria-label="Appointment Calendar"></div>
+            </div>
+
+
+
+            <div class="card p-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">Appointments</h2>
+                <button type="button" class="btn-primary mb-4" data-bs-toggle="modal" data-bs-target="#addAppointmentModal" title="Add a new appointment" aria-label="Add a new appointment">Add Appointment</button>
+                <ul class="space-y-2">
+                    {% for appt in appointments %}
+                    <li class="list-group-item p-3 flex justify-between items-center">
+                        <span>{{ appt.title }} - {{ appt.patient_name }} ({{ appt.date }} {{ appt.time }}, {{ appt.status }})</span>
+                        <a href="{{ url_for('edit_appointment', id=appt.id) }}" class="btn-primary text-sm" title="Edit appointment {{ appt.title }}" aria-label="Edit appointment {{ appt.title }}">Edit</a>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+
+  
+
+        <!-- Tasks -->
+        <div class="card p-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">Tasks</h2>
+            <button type="button" class="btn-primary mb-4" data-bs-toggle="modal" data-bs-target="#addTaskModal" title="Add a new task" aria-label="Add a new task">Add Task</button>
+            <ul id="task-list" class="space-y-2">
+                {% for task in tasks %}
+                <li class="list-group-item p-3 flex justify-between items-center task-item" data-priority="{{ task.priority }}">
+                    <span>{{ task.description }} (Priority: {{ task.priority }}, Due: {{ task.due_date }})</span>
+                    <a href="{{ url_for('edit_task', id=task.id) }}" class="btn-primary text-sm" title="Edit task {{ task.description }}" aria-label="Edit task {{ task.description }}">Edit</a>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <!-- Advanced Search Modal -->
+        <div class="modal fixed inset-0 flex items-center justify-center hidden" id="advancedSearchModal" tabindex="-1" role="dialog" aria-labelledby="advancedSearchModalLabel">
+            <div class="modal-content max-w-md w-full p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h5 class="text-lg font-bold" id="advancedSearchModalLabel">Advanced Search</h5>
+                    <button type="button" class="text-gray-600 hover:text-gray-800" data-bs-dismiss="modal" aria-label="Close">×</button>
+                </div>
+                <form action="{{ url_for('dashboard') }}" method="GET">
+                    <div class="mb-4">
+                        <label for="search-name" class="block text-sm font-medium text-gray-700">Name</label>
+                        <input type="text" class="w-full p-2 border rounded-md" id="search-name" name="name" value="{{ search_params.name }}" placeholder="Enter patient name" title="Patient name" aria-describedby="search-name-help">
+                        <small id="search-name-help" class="text-gray-500">Search by patient name</small>
+                    </div>
+                    <div class="mb-4">
+                        <label for="search-condition" class="block text-sm font-medium text-gray-700">Condition</label>
+                        <input type="text" class="w-full p-2 border rounded-md" id="search-condition" name="condition" value="{{ search_params.condition }}" placeholder="Enter medical condition" title="Medical condition" aria-describedby="search-condition-help">
+                        <small id="search-condition-help" class="text-gray-500">Search by medical condition</small>
+                    </div>
+                    <div class="mb-4">
+                        <label for="search-age-min" class="block text-sm font-medium text-gray-700">Age (Min)</label>
+                        <input type="number" class="w-full p-2 border rounded-md" id="search-age-min" name="age_min" value="{{ search_params.age_min }}" placeholder="Enter minimum age" title="Minimum age" aria-describedby="search-age-min-help">
+                        <small id="search-age-min-help" class="text-gray-500">Minimum patient age</small>
+                    </div>
+                    <div class="mb-4">
+                        <label for="search-age-max" class="block text-sm font-medium text-gray-700">Age (Max)</label>
+                        <input type="number" class="w-full p-2 border rounded-md" id="search-age-max" name="age_max" value="{{ search_params.age_max }}" placeholder="Enter maximum age" title="Maximum age" aria-describedby="search-age-max-help">
+                        <small id="search-age-max-help" class="text-gray-500">Maximum patient age</small>
+                    </div>
+                    <div class="mb-4">
+                        <label for="search-risk-min" class="block text-sm font-medium text-gray-700">Risk Level (Min)</label>
+                        <input type="number" step="0.1" class="w-full p-2 border rounded-md" id="search-risk-min" name="risk_min" value="{{ search_params.risk_min }}" placeholder="Enter minimum risk level" title="Minimum risk level" aria-describedby="search-risk-min-help">
+                        <small id="search-risk-min-help" class="text-gray-500">Minimum AI risk level</small>
+                    </div>
+                    <div class="mb-4">
+                        <label for="search-risk-max" class="block text-sm font-medium text-gray-700">Risk Level (Max)</label>
+                        <input type="number" step="0.1" class="w-full p-2 border rounded-md" id="search-risk-max" name="risk_max" value="{{ search_params.risk_max }}" placeholder="Enter maximum risk level" title="Maximum risk level" aria-describedby="search-risk-max-help">
+                        <small id="search-risk-max-help" class="text-gray-500">Maximum AI risk level</small>
+                    </div>
+                    <div class="flex gap-4">
+                        <button type="submit" class="btn-primary" title="Perform search" aria-label="Perform search">Search</button>
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary" title="Clear search filters" aria-label="Clear search filters">Clear</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Add Appointment Modal -->
+        <div class="modal fixed inset-0 flex items-center justify-center hidden" id="addAppointmentModal" tabindex="-1" role="dialog" aria-labelledby="addAppointmentModalLabel">
+            <div class="modal-content max-w-md w-full p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h5 class="text-lg font-bold" id="addAppointmentModalLabel">Add Appointment</h5>
+                    <button type="button" class="text-gray-600 hover:text-gray-800" data-bs-dismiss="modal" aria-label="Close">×</button>
+                </div>
+                <form method="POST" action="{{ url_for('add_appointment') }}">
+                    <div class="mb-4">
+                        <label for="appt-patient-id" class="block text-sm font-medium text-gray-700">Patient</label>
+                        <select class="w-full p-2 border rounded-md" id="appt-patient-id" name="patient_id" required title="Select patient" aria-describedby="appt-patient-id-help">
+                            {% for patient in patients %}
+                            <option value="{{ patient.id }}">{{ patient.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <small id="appt-patient-id-help" class="text-gray-500">Select a patient</small>
+                    </div>
+                    <div class="mb-4">
+                        <label for="appt-title" class="block text-sm font-medium text-gray-700">Title</label>
+                        <input type="text" class="w-full p-2 border rounded-md" id="appt-title" name="title" required placeholder="Enter appointment title" title="Appointment title" aria-describedby="appt-title-help">
+                        <small id="appt-title-help" class="text-gray-500">Appointment title</small>
+                    </div>
+                    <div class="mb-4">
+                        <label for="addAppointmentDate" class="block text-sm font-medium text-gray-700">Date</label>
+                        <input type="date" class="w-full p-2 border rounded-md" id="addAppointmentDate" name="date" required title="Appointment date" aria-describedby="appt-date-help">
+                        <small id="appt-date-help" class="text-gray-500">Appointment date</small>
+                    </div>
+                    <div class="mb-4">
+                        <label for="appt-time" class="block text-sm font-medium text-gray-700">Time</label>
+                        <input type="time" class="w-full p-2 border rounded-md" id="appt-time" name="time" required placeholder="Enter time" title="Appointment time" aria-describedby="appt-time-help">
+                        <small id="appt-time-help" class="text-gray-500">Appointment time</small>
+                    </div>
+                    <div class="mb-4">
+                        <label for="appt-notes" class="block text-sm font-medium text-gray-700">Notes</label>
+                        <textarea class="w-full p-2 border rounded-md" id="appt-notes" name="notes" placeholder="Enter notes" title="Appointment notes" aria-describedby="appt-notes-help"></textarea>
+                        <small id="appt-notes-help" class="text-gray-500">Additional notes</small>
+                    </div>
+                    <div class="mb-4">
+                        <label for="appt-status" class="block text-sm font-medium text-gray-700">Status</label>
+                        <select class="w-full p-2 border rounded-md" id="appt-status" name="status" required title="Appointment status" aria-describedby="appt-status-help">
+                            <option value="Upcoming">Upcoming</option>
+                            <option value="Completed">Completed</option>
+                        </select>
+                        <small id="appt-status-help" class="text-gray-500">Appointment status</small>
+                    </div>
+                    <button type="submit" class="btn-primary" title="Add appointment" aria-label="Add appointment">Add Appointment</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Add Task Modal -->
+        <div class="modal fixed inset-0 flex items-center justify-center hidden" id="addTaskModal" tabindex="-1" role="dialog" aria-labelledby="addTaskModalLabel">
+            <div class="modal-content max-w-md w-full p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h5 class="text-lg font-bold" id="addTaskModalLabel">Add Task</h5>
+                    <button type="button" class="text-gray-600 hover:text-gray-800" data-bs-dismiss="modal" aria-label="Close">×</button>
+                </div>
+                <form method="POST" action="{{ url_for('add_task') }}">
+                    <div class="mb-4">
+                        <label for="task-description" class="block text-sm font-medium text-gray-700">Description</label>
+                        <input type="text" class="w-full p-2 border rounded-md" id="task-description" name="description" required placeholder="Enter task description" title="Task description" aria-describedby="task-description-help">
+                        <small id="task-description-help" class="text-gray-500">Task description</small>
+                    </div>
+                    <div class="mb-4">
+                        <label for="task-priority" class="block text-sm font-medium text-gray-700">Priority</label>
+                        <select class="w-full p-2 border rounded-md" id="task-priority" name="priority" required title="Task priority" aria-describedby="task-priority-help">
+                            <option value="High">High</option>
+                            <option value="Medium">Medium</option>
+                            <option value="Low">Low</option>
+                        </select>
+                        <small id="task-priority-help" class="text-gray-500">Task priority</small>
+                    </div>
+                    <div class="mb-4">
+                        <label for="task-due-date" class="block text-sm font-medium text-gray-700">Due Date</label>
+                        <input type="date" class="w-full p-2 border rounded-md" id="task-due-date" name="due_date" required title="Task due date" aria-describedby="task-due-date-help">
+                        <small id="task-due-date-help" class="text-gray-500">Task due date</small>
+                    </div>
+                    <div class="mb-4">
+                        <label for="task-status" class="block text-sm font-medium text-gray-700">Status</label>
+                        <select class="w-full p-2 border rounded-md" id="task-status" name="status" required title="Task status" aria-describedby="task-status-help">
+                            <option value="Pending">Pending</option>
+                            <option value="Completed">Completed</option>
+                        </select>
+                        <small id="task-status-help" class="text-gray-500">Task status</small>
+                    </div>
+                    <button type="submit" class="btn-primary" title="Add task" aria-label="Add task">Add Task</button>
+                </form>
+            </div>
+        </div>
+
+    <!-- AI-Driven Insights -->
+    <div class="card p-6 mb-8">
+        <h2 class="text-xl font-bold text-gray-800 mb-4">AI-Driven Insights</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+                <h3 class="text-lg font-semibold text-gray-700">Suggested Appointments</h3>
+                <ul id="suggested-appointments" class="space-y-2"></ul>
+            </div>
+            <div>
+                <h3 class="text-lg font-semibold text-gray-700">Health Trends</h3>
+                <ul id="health-trends" class="space-y-2"></ul>
+            </div>
+            <div>
+                <h3 class="text-lg font-semibold text-gray-700">Patient Risk Clusters</h3>
+                <ul id="risk-clusters" class="space-y-2"></ul>
+            </div>
+            <div>
+                <h3 class="text-lg font-semibold text-gray-700">No-Show Predictions</h3>
+                <ul id="no-show-predictions" class="space-y-2"></ul>
+            </div>
+            <div>
+                <h3 class="text-lg font-semibold text-gray-700">Follow-Up Recommendations</h3>
+                <ul id="follow-up-recommendations" class="space-y-2"></ul>
+            </div>
+        </div>
+    </div>
+
+
+        <script>
+            // Modal handling for Tailwind
+            document.querySelectorAll('[data-bs-toggle="modal"]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const target = btn.getAttribute('data-bs-target').substring(1);
+                    document.getElementById(target).classList.remove('hidden');
+                });
+            });
+            document.querySelectorAll('[data-bs-dismiss="modal"]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    btn.closest('.modal').classList.add('hidden');
+                });
+            });
+            document.getElementById('selectAll')?.addEventListener('change', function() {
+                document.querySelectorAll('.patient-checkbox').forEach(cb => cb.checked = this.checked);
+            });
+
+            // Analytics charts
+            try {
+                const analytics = {{ analytics | tojson | safe }};
+                console.log("Analytics data in JS:", analytics);
+
+                if (!analytics.age_groups.length) analytics.age_groups = [{label: 'No Data', count: 0}];
+                if (!analytics.conditions.length) analytics.conditions = [{label: 'No Data', count: 0}];
+                if (!analytics.appointment_stats.length) analytics.appointment_stats = [{label: 'No Data', count: 0}];
+                if (!analytics.task_stats.length) analytics.task_stats = [{label: 'No Data', count: 0}];
+
+                new Chart(document.getElementById('ageChart'), {
+                    type: 'bar',
+                    data: {
+                        labels: analytics.age_groups.map(item => item.label),
+                        datasets: [{
+                            label: 'Patients by Age Group',
+                            data: analytics.age_groups.map(item => item.count),
+                            backgroundColor: '#2563eb'
+                        }]
+                    },
+                    options: { scales: { y: { beginAtZero: true } } }
+                });
+
+                new Chart(document.getElementById('conditionChart'), {
+                    type: 'pie',
+                    data: {
+                        labels: analytics.conditions.map(item => item.label),
+                        datasets: [{
+                            label: 'Patient Conditions',
+                            data: analytics.conditions.map(item => item.count),
+                            backgroundColor: ['#2563eb', '#16a34a', '#dc2626', '#f59e0b']
+                        }]
+                    }
+                });
+
+                new Chart(document.getElementById('appointmentChart'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: analytics.appointment_stats.map(item => item.label),
+                        datasets: [{
+                            label: 'Appointment Status',
+                            data: analytics.appointment_stats.map(item => item.count),
+                            backgroundColor: ['#2563eb', '#16a34a']
+                        }]
+                    }
+                });
+
+                new Chart(document.getElementById('taskChart'), {
+                    type: 'bar',
+                    data: {
+                        labels: analytics.task_stats.map(item => item.label),
+                        datasets: [{
+                            label: 'Task Status',
+                            data: analytics.task_stats.map(item => item.count),
+                            backgroundColor: '#2563eb'
+                        }]
+                    },
+                    options: { scales: { y: { beginAtZero: true } } }
+                });
+            } catch (e) {
+                console.error("Chart.js initialization failed:", e);
+            }
+        </script>
+    </div>
+</body>
+</html>

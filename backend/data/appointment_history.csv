@@ -1,0 +1,6 @@
+patient_name,risk_level,appointment_date,appointment_duration
+John Doe,High,2024-04-01 10:00,30
+Jane Smith,Medium,2024-04-01 11:00,20
+Michael Johnson,Low,2024-04-02 09:00,15
+Emily Brown,Medium,2024-04-02 10:00,25
+William Davis,High,2024-04-03 14:00,30

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Patient</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container mt-4">
+        <div class="card">
+            <div class="card-header">Add Patient</div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('add_patient') }}">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Name</label>
+                        <input type="text" class="form-control" id="name" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="age" class="form-label">Age</label>
+                        <input type="number" class="form-control" id="age" name="age" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="gender" class="form-label">Gender</label>
+                        <select class="form-control" id="gender" name="gender" required>
+                            <option value="M">Male</option>
+                            <option value="F">Female</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="condition" class="form-label">Condition</label>
+                        <input type="text" class="form-control" id="condition" name="condition">
+                    </div>
+                    <div class="mb-3">
+                        <label for="medical_history" class="form-label">Medical History</label>
+                        <textarea class="form-control" id="medical_history" name="medical_history"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="recent_vitals" class="form-label">Recent Vitals (e.g., HR:80, BP:120/80)</label>
+                        <input type="text" class="form-control" id="recent_vitals" name="recent_vitals">
+                    </div>
+                    <div class="mb-3">
+                        <label for="contact_info" class="form-label">Contact Info</label>
+                        <input type="text" class="form-control" id="contact_info" name="contact_info">
+                    </div>
+                    <div class="mb-3">
+                        <label for="allergies" class="form-label">Allergies</label>
+                        <input type="text" class="form-control" id="allergies" name="allergies">
+                    </div>
+                    <div class="mb-3">
+                        <label for="medications" class="form-label">Medications</label>
+                        <input type="text" class="form-control" id="medications" name="medications">
+                    </div>
+                    <div class="mb-3">
+                        <label for="last_visit" class="form-label">Last Visit (YYYY-MM-DD)</label>
+                        <input type="date" class="form-control" id="last_visit" name="last_visit">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Add Patient</button>
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Cancel</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

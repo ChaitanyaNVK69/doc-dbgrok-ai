@@ -1,0 +1,135 @@
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f4f6f9;
+}
+.navbar {
+    background-color: #007bff;
+}
+.navbar-brand, .nav-link {
+    color: white !important;
+}
+.card {
+    border: none;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+.card-header {
+    background-color: #007bff;
+    color: white;
+}
+.table th, .table td {
+    vertical-align: middle;
+}
+#calendar {
+    max-width: 900px;
+    margin: 20px auto;
+}
+.btn-primary {
+    background-color: #007bff;
+    border-color: #007bff;
+}
+.btn-primary:hover {
+    background-color: #0056b3;
+}
+.modal-content {
+    border-radius: 10px;
+}
+.list-group-item {
+    cursor: pointer;
+}
+.list-group-item:hover {
+    background-color: #f8f9fa;
+}
+.alert-warning {
+    background-color: #fff3cd;
+    border-color: #ffeeba;
+}
+.alert-info {
+    background-color: #d1ecf1;
+    border-color: #bee5eb;
+}
+.search-form {
+    max-width: 300px;
+}
+.advanced-search-modal .modal-body {
+    padding: 20px;
+}
+.advanced-search-modal .form-label {
+    font-weight: bold;
+}
+.analytics-chart {
+    max-height: 200px;
+}
+.ai-card {
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    background: rgba(245, 245, 245, 0.8);
+}
+.btn-info {
+    display: inline-flex;
+    align-items: center;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: white;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+    cursor: pointer;
+    border: none;
+}
+.btn-info:hover {
+    transform: translateY(-1px);
+}
+.btn-info:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5);
+}
+.btn-info:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Fallback colors for buttons */
+.btn-info.bg-purple-600 {
+    background-color: #9333EA; /* Tailwind purple-600 */
+}
+.btn-info.bg-purple-600:hover {
+    background-color: #7E22CE; /* Tailwind purple-700 */
+}
+.btn-info.bg-orange-600 {
+    background-color: #F97316; /* Tailwind orange-600 */
+}
+.btn-info.bg-orange-600:hover {
+    background-color: #EA580C; /* Tailwind orange-700 */
+}
+.btn-info.bg-indigo-600 {
+    background-color: #4F46E5; /* Tailwind indigo-600 */
+}
+.btn-info.bg-indigo-600:hover {
+    background-color: #4338CA; /* Tailwind indigo-700 */
+}
+.btn-info.bg-teal-600 {
+    background-color: #14B8A6; /* Tailwind teal-600 */
+}
+.btn-info.bg-teal-600:hover {
+    background-color: #0D9488; /* Tailwind teal-700 */
+}
+.btn-info.bg-cyan-600 {
+    background-color: #06B6D4; /* Tailwind cyan-600 */
+}
+.btn-info.bg-cyan-600:hover {
+    background-color: #0891B2; /* Tailwind cyan-700 */
+}
+.btn-info.bg-green-600 {
+    background-color: #16A34A; /* Tailwind green-600 */
+}
+.btn-info.bg-green-600:hover {
+    background-color: #15803D; /* Tailwind green-700 */
+}
+
+@media (max-width: 768px) {
+    .btn-info {
+        padding: 8px 16px;
+        font-size: 12px;
+    }
+}

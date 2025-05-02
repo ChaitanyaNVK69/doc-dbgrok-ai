@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Patient</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container mt-4">
+        <div class="card">
+            <div class="card-header">Edit Patient</div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('edit_patient', id=patient.id) }}">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Name</label>
+                        <input type="text" class="form-control" id="name" name="name" value="{{ patient.name }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="age" class="form-label">Age</label>
+                        <input type="number" class="form-control" id="age" name="age" value="{{ patient.age }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="gender" class="form-label">Gender</label>
+                        <select class="form-control" id="gender" name="gender" required>
+                            <option value="M" {% if patient.gender == 'M' %}selected{% endif %}>Male</option>
+                            <option value="F" {% if patient.gender == 'F' %}selected{% endif %}>Female</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="condition" class="form-label">Condition</label>
+                        <input type="text" class="form-control" id="condition" name="condition" value="{{ patient.condition }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="medical_history" class="form-label">Medical History</label>
+                        <textarea class="form-control" id="medical_history" name="medical_history">{{ patient.medical_history }}</textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="recent_vitals" class="form-label">Recent Vitals</label>
+                        <input type="text" class="form-control" id="recent_vitals" name="recent_vitals" value="{{ patient.recent_vitals }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="contact_info" class="form-label">Contact Info</label>
+                        <input type="text" class="form-control" id="contact_info" name="contact_info" value="{{ patient.contact_info }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="allergies" class="form-label">Allergies</label>
+                        <input type="text" class="form-control" id="allergies" name="allergies" value="{{ patient.allergies }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="medications" class="form-label">Medications</label>
+                        <input type="text" class="form-control" id="medications" name="medications" value="{{ patient.medications }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="last_visit" class="form-label">Last Visit</label>
+                        <input type="date" class="form-control" id="last_visit" name="last_visit" value="{{ patient.last_visit }}">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Update Patient</button>
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Cancel</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
