@@ -1,6 +1,5 @@
 import sqlite3
 conn = sqlite3.connect('doctor_dashboard.db')
-
 from datetime import datetime
 
 
@@ -24,6 +23,7 @@ from datetime import datetime
 # conn.execute('INSERT OR REPLACE INTO registered_numbers (phone_number) VALUES (?)', ('+917672098619',))
 # conn.commit()
 # conn.close()
+
 
 # cursor = conn.execute('SELECT * FROM appointments')
 # print(cursor.fetchall())
@@ -94,4 +94,5 @@ from datetime import datetime
 # print("Medical Notes:", c.fetchall())
 # # c.execute('SELECT * FROM appointments')
 # # print("Appointments:", c.fetchall())
-# conn.close()
+# conn.close()sqlite3 doctor_dashboard.db
+

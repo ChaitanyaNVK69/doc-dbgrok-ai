@@ -27,6 +27,7 @@ import requests  # For WhatsApp API
 import re
 import requests
 import threading
+import psycopg2
 
 # Import the init_db function to create the database schema
 from init_db import init_db
@@ -92,14 +93,41 @@ mail = Mail(app)
 
 
 
+# def get_db_connection():
+#     conn = sqlite3.connect('doctor_dashboard.db')
+#     conn.row_factory = sqlite3.Row
+#      # Set a busy timeout of 10 seconds to wait for locks to be released
+#     conn.execute('PRAGMA busy_timeout = 10000')
+#     return conn
+
 def get_db_connection():
-    conn = sqlite3.connect('doctor_dashboard.db')
-    conn.row_factory = sqlite3.Row
-     # Set a busy timeout of 10 seconds to wait for locks to be released
-    conn.execute('PRAGMA busy_timeout = 10000')
+    # Debug: Print environment variables
+    print("Environment variables:", {k: v for k, v in os.environ.items() if k.startswith('DB_') or k == 'RENDER'})
+    render_env = os.environ.get('RENDER', 'false').lower()
+    print(f"RENDER environment variable: {render_env}")
+    is_render = render_env == 'true'
+    print(f"Is running on Render? {is_render}")
+
+    if is_render:
+        print("Connecting to PostgreSQL on Render")
+        try:
+            # Only use PostgreSQL if explicitly on Render
+            conn = psycopg2.connect(
+                dbname=os.environ.get('DB_NAME'),
+                user=os.environ.get('DB_USER'),
+                password=os.environ.get('DB_PASSWORD'),
+                host=os.environ.get('DB_HOST'),
+                port=os.environ.get('DB_PORT'),
+                sslmode='require'
+            )
+        except psycopg2.Error as e:
+            print(f"Failed to connect to PostgreSQL: {e}")
+            raise
+    else:
+        print("Forcing local SQLite database connection")
+        conn = sqlite3.connect('doctor_dashboard.db')
+        conn.row_factory = sqlite3.Row
     return conn
-
-
 
 # Initialize database tables
 with app.app_context():
@@ -1646,6 +1674,67 @@ def get_patients():
         print(f"Error fetching patients: {e}")
         return jsonify({'error': str(e)}), 500
 
+
+# @app.route('/api/tasks')
+# def get_tasks():
+#     try:
+#         status = request.args.get('status', None)
+#         conn = get_db_connection()
+#         query = 'SELECT id, patient_id, description, status, due_date FROM tasks'
+#         params = []
+#         if status:
+#             query += ' WHERE status = %s'
+#             params.append(status)
+#         tasks = conn.execute(query, params).fetchall()
+#         conn.close()
+#         return jsonify([dict(row) for row in tasks])
+#     except Exception as e:
+#         print(f"Error fetching tasks: {e}")
+#         return jsonify({'error': str(e)}), 500
+@app.route('/api/tasks')
+def get_tasks():
+    try:
+        status = request.args.get('status', None)  # e.g., 'pending'
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        if 'RENDER' in os.environ and os.environ.get('RENDER') == 'true':
+            if status:
+                query = 'SELECT id, patient_id, description, status, due_date FROM tasks WHERE status = %s ORDER BY due_date ASC'
+                cursor.execute(query, (status,))
+            else:
+                query = 'SELECT id, patient_id, description, status, due_date FROM tasks ORDER BY due_date ASC'
+                cursor.execute(query)
+        else:
+            if status:
+                query = 'SELECT id, patient_id, description, status, due_date FROM tasks WHERE status = ? ORDER BY due_date ASC'
+                cursor.execute(query, (status,))
+            else:
+                query = 'SELECT id, patient_id, description, status, due_date FROM tasks ORDER BY due_date ASC'
+                cursor.execute(query)
+
+        tasks = cursor.fetchall()
+
+        task_list = [
+            {
+                'id': task['id'],
+                'patient_id': task['patient_id'],
+                'description': task['description'],
+                'status': task['status'],
+                'due_date': task['due_date']
+            } for task in tasks
+        ]
+
+        cursor.close()
+        conn.close()
+        return jsonify(task_list)
+    except (psycopg2.Error, sqlite3.Error) as e:
+        print(f"Database error in /api/tasks: {e}")
+        return jsonify({'error': str(e)}), 500
+    except Exception as e:
+        print(f"Unexpected error in /api/tasks: {e}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/patient_notes/<int:patient_id>')
 def get_patient_notes(patient_id):
     try:
@@ -2720,6 +2809,74 @@ def debug_routes():
         })
     print("Registered routes:", routes)
     return jsonify(routes)
+
+
+
+@app.route('/tasks')
+def tasks():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    try:
+        status = request.args.get('status', None)  # e.g., 'pending'
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Use a single query with conditional parameter passing
+        # SQLite uses ? placeholders, PostgreSQL uses %s
+        if 'RENDER' in os.environ and os.environ.get('RENDER') == 'true':
+            if status:
+                query = 'SELECT id, patient_id, description, status, due_date FROM tasks WHERE status = %s ORDER BY due_date ASC'
+                cursor.execute(query, (status,))
+            else:
+                query = 'SELECT id, patient_id, description, status, due_date FROM tasks ORDER BY due_date ASC'
+                cursor.execute(query)
+        else:
+            if status:
+                query = 'SELECT id, patient_id, description, status, due_date FROM tasks WHERE status = ? ORDER BY due_date ASC'
+                cursor.execute(query, (status,))
+            else:
+                query = 'SELECT id, patient_id, description, status, due_date FROM tasks ORDER BY due_date ASC'
+                cursor.execute(query)
+
+        tasks = cursor.fetchall()
+
+        # Convert to list of dictionaries for template rendering
+        task_list = [
+            {
+                'id': task['id'],
+                'patient_id': task['patient_id'],
+                'description': task['description'],
+                'status': task['status'],
+                'due_date': task['due_date']
+            } for task in tasks
+        ]
+
+        cursor.close()
+        conn.close()
+        return render_template('tasks.html', tasks=task_list)
+    except (psycopg2.Error, sqlite3.Error) as e:
+        print(f"Database error in /tasks: {e}")
+        return jsonify({'error': str(e)}), 500
+    except Exception as e:
+        print(f"Unexpected error in /tasks: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+
+@app.route('/patients')
+def patients():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    try:
+        conn = get_db_connection()
+        patients = conn.execute('SELECT id, name, whatsapp_number FROM patients ORDER BY name').fetchall()
+        conn.close()
+        return render_template('patients.html', patients=patients)
+    except Exception as e:
+        print(f"Error rendering patients page: {e}")
+        return jsonify({'error': str(e)}), 500
 
 
 

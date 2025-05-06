@@ -2467,3 +2467,58 @@ function setupDropdownMenus() {
         });
     });
 }
+
+
+
+function navigateToPatients() {
+    window.location.href = '/patients';
+}
+
+function navigateToAppointments(status) {
+    window.location.href = `/dashboard/appointments?status=${status}`;
+}
+
+function navigateToTasks(status) {
+    window.location.href = `/tasks?status=${status}`;
+}
+
+async function loadDashboardMetrics() {
+    try {
+        // Fetch Total Patients
+        const patientsResponse = await fetch('/api/patients', { credentials: 'include' });
+        if (!patientsResponse.ok) throw new Error('Failed to fetch patients');
+        const patients = await patientsResponse.json();
+        const totalPatients = patients.length;
+        document.getElementById('totalPatients').textContent = totalPatients;
+
+        // Fetch Appointments (already in loadAppointments)
+        const appointmentsResponse = await fetch('/get_appointments', { credentials: 'include' });
+        if (!appointmentsResponse.ok) throw new Error('Failed to fetch appointments');
+        const appointments = await appointmentsResponse.json();
+
+        // Calculate Upcoming and Completed Appointments
+        const referenceDate = new Date('2025-05-02T00:00:00');  // Current date
+        let upcoming = 0;
+        let completed = 0;
+        appointments.forEach(a => {
+            const date = new Date(a.date);
+            if (a.status === 'upcoming' || date >= referenceDate) {
+                upcoming++;
+            } else if (a.status === 'completed') {
+                completed++;
+            }
+        });
+        document.getElementById('upcomingAppointments').textContent = upcoming;
+        document.getElementById('completedAppointments').textContent = completed;
+
+        // Fetch Pending Tasks
+        const tasksResponse = await fetch('/api/tasks?status=pending', { credentials: 'include' });
+        if (!tasksResponse.ok) throw new Error('Failed to fetch tasks');
+        const tasks = await tasksResponse.json();
+        const pendingTasks = tasks.length;
+        document.getElementById('pendingTasks').textContent = pendingTasks;
+    } catch (error) {
+        console.error('Error loading dashboard metrics:', error.message);
+        showError('errorMessage', 'Error loading dashboard metrics: ' + error.message);
+    }
+}

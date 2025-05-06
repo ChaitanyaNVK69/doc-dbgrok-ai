@@ -136,7 +136,7 @@
         }
     </style>
 </head>
-
+<body>
     <!-- Navigation Bar -->
     <nav class="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-4">
         <div class="container mx-auto flex justify-between items-center">
@@ -159,62 +159,46 @@
             </div>
         </div>
     </nav>
-<body class="bg-gray-100">
-    <div class="container mx-auto p-6">
-        <h1 class="text-2xl font-bold mb-6">Edit Appointment</h1>
-        {% with messages = get_flashed_messages() %}
-            {% if messages %}
-                <div class="bg-red-500 text-white p-4 rounded mb-4">
-                    {% for message in messages %}
-                        <p>{{ message }}</p>
-                    {% endfor %}
-                </div>
-            {% endif %}
-        {% endwith %}
-        <form method="POST" class="bg-white p-6 rounded shadow-md">
-            <div class="mb-4">
-                <label for="patient_id" class="block text-sm font-medium text-gray-700">Patient</label>
-                <select id="patient_id" name="patient_id" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm">
-                    {% for patient in patients %}
-                        <option value="{{ patient.id }}" {% if patient.id == appointment.patient_id %}selected{% endif %}>{{ patient.name }}</option>
-                    {% endfor %}
-                </select>
+
+    <div class="container mx-auto p-4 sm:p-6">
+        <div class="card p-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">Tasks</h2>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full table-auto border-collapse">
+                    <thead>
+                        <tr class="bg-gray-100 text-gray-700">
+                            <th class="p-3 text-left">Patient ID</th>
+                            <th class="p-3 text-left">Description</th>
+                            <th class="p-3 text-left">Status</th>
+                            <th class="p-3 text-left">Due Date</th>
+                            <th class="p-3 text-left">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="task-list">
+                        {% if tasks %}
+                            {% for task in tasks %}
+                            <tr class="border-b hover:bg-gray-50">
+                                <td class="p-3">{{ task.patient_id or 'N/A' }}</td>
+                                <td class="p-3">{{ task.description }}</td>
+                                <td class="p-3">{{ task.status }}</td>
+                                <td class="p-3">{{ task.due_date }}</td>
+                                <td class="p-3">
+                                    <a href="{{ url_for('add_task') }}" class="btn-primary text-sm mr-2">Add New Task</a>
+                                    <a href="{{ url_for('edit_task', id=task.id) }}" class="btn-primary text-sm mr-2">Edit</a>
+                                    <a href="{{ url_for('delete_task', id=task.id) }}" class="btn-primary text-sm bg-red-600 hover:bg-red-700">Delete</a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="5" class="p-3 text-center text-gray-500">No tasks available</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
             </div>
-            <div class="mb-4">
-                <label for="doctor_id" class="block text-sm font-medium text-gray-700">Doctor</label>
-                <select id="doctor_id" name="doctor_id" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm">
-                    {% for doctor in doctors %}
-                        <option value="{{ doctor.id }}" {% if doctor.id == appointment.doctor_id %}selected{% endif %}>{{ doctor.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="mb-4">
-                <label for="title" class="block text-sm font-medium text-gray-700">Title</label>
-                <input type="text" id="title" name="title" value="{{ appointment.title }}" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" required>
-            </div>
-            <div class="mb-4">
-                <label for="date" class="block text-sm font-medium text-gray-700">Date</label>
-                <input type="date" id="date" name="date" value="{{ appointment.date }}" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" required>
-            </div>
-            <div class="mb-4">
-                <label for="time" class="block text-sm font-medium text-gray-700">Time</label>
-                <input type="time" id="time" name="time" value="{{ appointment.time }}" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" required>
-            </div>
-            <div class="mb-4">
-                <label for="notes" class="block text-sm font-medium text-gray-700">Notes</label>
-                <textarea id="notes" name="notes" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm">{{ appointment.notes }}</textarea>
-            </div>
-            <div class="mb-4">
-                <label for="status" class="block text-sm font-medium text-gray-700">Status</label>
-                <select id="status" name="status" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm">
-                    <option value="Pending" {% if appointment.status == 'Pending' %}selected{% endif %}>Pending</option>
-                    <option value="Upcoming" {% if appointment.status == 'Upcoming' %}selected{% endif %}>Upcoming</option>
-                    <option value="Completed" {% if appointment.status == 'Completed' %}selected{% endif %}>Completed</option>
-                    <option value="Missed" {% if appointment.status == 'Missed' %}selected{% endif %}>Missed</option>
-                </select>
-            </div>
-            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Update Appointment</button>
-        </form>
+        </div>
     </div>
 </body>
 </html>
