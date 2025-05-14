@@ -3,11 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Appointments - Doctor Dashboard</title>
+    <title>Add Task</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"> -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script src="{{ url_for('static', filename='js/socket.io.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
     <style>
         :root {
             --royal-blue: #2563EB;
@@ -18,31 +20,26 @@
             --navy-blue: #1A2A44;
             --teal-highlight: #4A90E2;
         }
-
         body {
             font-family: 'Inter', sans-serif;
             background: linear-gradient(135deg, #e6f3ff 0%, #f0f9ff 100%);
             margin: 0;
         }
-
         .container {
             max-width: 1400px;
             margin: 0 auto;
             padding: 1rem;
         }
-
         .card {
             background: white;
             border-radius: 12px;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
             transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
-
         .card:hover {
             transform: translateY(-5px);
             box-shadow: 0 6px 25px rgba(0, 0, 0, 0.15);
         }
-
         .btn-primary {
             background: #2563eb;
             color: white;
@@ -50,74 +47,38 @@
             border-radius: 8px;
             transition: background 0.3s ease;
         }
-
         .btn-primary:hover {
             background: #1e40af;
         }
-
-        .btn-danger {
-            background: #dc2626;
-            color: white;
-            padding: 10px 20px;
-            border-radius: 8px;
-            transition: background 0.3s ease;
-        }
-
-        .btn-danger:hover {
-            background: #b91c1c;
-        }
-
-        .table th, .table td {
-            padding: 12px;
-            vertical-align: middle;
-        }
-
         .alert {
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         }
-
-        /* Dropdown menu styles 
-        .dropdown:hover .dropdown-menu {
-            display: block;
-        } */
-
-        /* Dropdown menu styles */
-    .dropdown {
-        position: relative;
-    }
-
-    .dropdown-menu {
-        display: none;
-        position: absolute;
-        right: 0;
-        top: 100%;
-        margin-top: 0.5rem;
-        width: 12rem;
-        background-color: white;
-        border-radius: 0.375rem;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        z-index: 20;
-    }
-
-    .dropdown:hover .dropdown-menu,
-    .dropdown-menu:hover {
-        display: block;
-    }
-
-    .dropdown-menu a {
-        display: block;
-        padding: 0.5rem 1rem;
-        color: #1f2937;
-        transition: background-color 0.2s ease;
-    }
-
-    .dropdown-menu a:hover {
-        background-color: #dbeafe;
-    }
-
-
-        /* Mobile optimizations */
+        .chat-container {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 1rem;
+            background-color: #f9fafb;
+        }
+        .chat-message {
+            margin-bottom: 1rem;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            max-width: 70%;
+        }
+        .chat-message.user {
+            background-color: #2563eb;
+            color: white;
+            margin-left: auto;
+            text-align: right;
+        }
+        .chat-message.bot {
+            background-color: #e5e7eb;
+            color: #1f2937;
+            margin-right: auto;
+        }
         @media (max-width: 768px) {
             .text-4xl { font-size: 2rem; }
             .text-xl { font-size: 1.125rem; }
@@ -129,10 +90,6 @@
             .flex-col { flex-direction: column; }
             .justify-between { justify-content: flex-start; }
             .mb-4 { margin-bottom: 1rem; }
-            .dropdown-menu {
-            width: 100%;
-            position: static;
-            }
         }
     </style>
 </head>
@@ -140,7 +97,8 @@
     <!-- Navigation Bar -->
     <nav class="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-4">
         <div class="container mx-auto flex justify-between items-center">
-            <a class="text-2xl font-bold" href="#">Doctor Dashboard</a>
+            <!-- <a class="text-2xl font-bold" href="#">Doctor Dashboard</a> -->
+            <a class="text-2xl font-bold hover:text-blue-200 transition" href="{{ url_for('dashboard') }}">Doctor Dashboard</a>
             <div class="flex items-center space-x-4">
                 <a class="text-white hover:text-blue-200 transition" href="{{ url_for('dashboard') }}">Dashboard</a>
                 <a class="text-white hover:text-blue-200 transition" href="{{ url_for('appointments') }}">Appointments</a>
@@ -160,46 +118,71 @@
         </div>
     </nav>
 
+ 
     <div class="container mx-auto p-4 sm:p-6">
         <div class="card p-6">
-            <h2 class="text-xl font-bold text-gray-800 mb-4">Tasks</h2>
-            
-            <div class="overflow-x-auto">
-                <table class="w-full table-auto border-collapse">
-                    <thead>
-                        <tr class="bg-gray-100 text-gray-700">
-                            <th class="p-3 text-left">Patient ID</th>
-                            <th class="p-3 text-left">Description</th>
-                            <th class="p-3 text-left">Status</th>
-                            <th class="p-3 text-left">Due Date</th>
-                            <th class="p-3 text-left">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="task-list">
-                        {% if tasks %}
-                            {% for task in tasks %}
-                            <tr class="border-b hover:bg-gray-50">
-                                <td class="p-3">{{ task.patient_id or 'N/A' }}</td>
-                                <td class="p-3">{{ task.description }}</td>
-                                <td class="p-3">{{ task.status }}</td>
-                                <td class="p-3">{{ task.due_date }}</td>
-                                <td class="p-3">
-                                    <a href="{{ url_for('add_task') }}" class="btn-primary text-sm mr-2">Add New Task</a>
-                                    <a href="{{ url_for('edit_task', id=task.id) }}" class="btn-primary text-sm mr-2">Edit</a>
-                                    <a href="{{ url_for('delete_task', id=task.id) }}" class="btn-danger text-sm bg-red-600 hover:bg-red-700">Delete</a>
-                                    
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        {% else %}
-                            <tr>
-                                <td colspan="5" class="p-3 text-center text-gray-500">No tasks available</td>
-                            </tr>
-                        {% endif %}
-                    </tbody>
-                </table>
+            <h2 class="text-xl font-bold text-gray-800 mb-4">Dynamic Chatbot</h2>
+            <div class="chat-container" id="chat-container">
+                {% if chat_history %}
+                    {% for message in chat_history %}
+                    <div class="chat-message {{ message.sender }}">{{ message.message }}</div>
+                    {% endfor %}
+                {% else %}
+                    <div class="chat-message bot">Hello! I'm your dynamic chatbot. How can I assist you today?</div>
+                {% endif %}
+            </div>
+            <div class="mt-4 flex items-center">
+                <input type="text" id="chat-input" class="w-full p-2 border rounded-md" placeholder="Type your message..." onkeypress="if(event.key === 'Enter') sendMessage()">
+                <button onclick="sendMessage()" class="btn-primary ml-2">Send</button>
             </div>
         </div>
     </div>
+
+    <script>
+        const socket = io();
+
+        socket.on('connect', () => {
+            console.log('Connected to SocketIO server');
+        });
+
+        socket.on('chat_response', (data) => {
+            if (data.error) {
+                appendMessage('bot', 'Error: ' + data.error);
+            } else {
+                appendMessage('bot', data.message);
+            }
+        });
+
+        function appendMessage(sender, message) {
+            const chatContainer = document.getElementById('chat-container');
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('chat-message', sender);
+            messageElement.textContent = message;
+            chatContainer.appendChild(messageElement);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            if (message) {
+                appendMessage('user', message);
+                socket.emit('send_message', { message: message });
+                input.value = '';
+            }
+        }
+
+        // Toggle dropdown menu
+        document.addEventListener('DOMContentLoaded', () => {
+            const dropdowns = document.querySelectorAll('.dropdown');
+            dropdowns.forEach(dropdown => {
+                const button = dropdown.querySelector('button');
+                const menu = dropdown.querySelector('.dropdown-menu');
+                button.addEventListener('click', () => {
+                    menu.classList.toggle('hidden');
+                });
+            });
+        });
+    </script>
 </body>
 </html>

@@ -2522,3 +2522,4 @@ async function loadDashboardMetrics() {
         showError('errorMessage', 'Error loading dashboard metrics: ' + error.message);
     }
 }
+
