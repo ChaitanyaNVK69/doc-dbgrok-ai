@@ -60,21 +60,6 @@ def init_db():
             whatsapp_number TEXT
         )
     ''')
-    
-    # # Appointments table
-    # c.execute('''
-    #     CREATE TABLE IF NOT EXISTS appointments (
-    #         id INTEGER PRIMARY KEY AUTOINCREMENT,
-    #         patient_id INTEGER,
-    #         patient_name TEXT,
-    #         title TEXT,
-    #         date TEXT,
-    #         time TEXT,
-    #         notes TEXT,
-    #         status TEXT,
-    #         FOREIGN KEY (patient_id) REFERENCES patients(id)
-    #     )
-    # ''')
 
       # Create appointments table
     c.execute('''
@@ -96,7 +81,7 @@ def init_db():
        ''')
 
 
-        # Create medical_notes table
+    # Create medical_notes table
     c.execute('''
         CREATE TABLE IF NOT EXISTS medical_notes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -111,7 +96,7 @@ def init_db():
         ''')
 
 
-        # Create billing table
+    # Create billing table
     c.execute('''
             CREATE TABLE IF NOT EXISTS billing (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -125,8 +110,6 @@ def init_db():
             )
         ''')
 
-
-
     # Add patient_notes table
     c.execute('''
     CREATE TABLE IF NOT EXISTS patient_notes (
@@ -138,20 +121,32 @@ def init_db():
         )
         ''')
 
-    # New WhatsApp messages table
+    #  New WhatsApp messages table (legacy table, not used in current implementation)
     c.execute('''
         CREATE TABLE IF NOT EXISTS whatsapp_messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             patient_id INTEGER,
             message TEXT NOT NULL,
-            sender TEXT NOT NULL,
+            sender TEXT NOT NULL, -- 'patient', 'doctor', or 'bot'
             timestamp TEXT NOT NULL,
-            type TEXT NOT NULL,
+            message_type TEXT NOT NULL, -- 'text', 'summary', 'result', 'reminder', 'emergency'
             FOREIGN KEY (patient_id) REFERENCES patients(id)
         )
     ''')
 
-
+    # Create whatsapp_conversations table
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS whatsapp_conversations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            patient_id INTEGER,
+            message TEXT NOT NULL,
+            sender TEXT NOT NULL, -- 'patient', 'doctor', or 'bot'
+            timestamp TEXT NOT NULL,
+            message_type TEXT NOT NULL, -- 'text', 'summary', 'result', 'reminder', 'emergency'
+            FOREIGN KEY (patient_id) REFERENCES patients (id)
+        )
+    ''')
+    
     # New WhatsApp FAQ table
     c.execute('''
         CREATE TABLE IF NOT EXISTS whatsapp_faq (
@@ -160,14 +155,62 @@ def init_db():
             answer TEXT NOT NULL
         )
     ''')
-    faqs = conn.execute('SELECT COUNT(*) FROM whatsapp_faq').fetchone()[0]
-    if faqs == 0:
-        sample_faqs = [
-            ('What are the clinic hours?', 'Our clinic is open from 9 AM to 5 PM, Monday to Friday.'),
-            ('How do I pay for my appointment?', 'You can pay online via our portal or at the clinic reception.')
-        ]
-        conn.executemany('INSERT INTO whatsapp_faq (question, answer) VALUES (?, ?)', sample_faqs)
 
+    # Populate whatsapp_faq with sample FAQs if empty
+    cursor = c.execute('SELECT COUNT(*) FROM whatsapp_faq')
+    if cursor.fetchone()[0] == 0:
+        sample_faqs = [
+            ('What are the clinic hours?', 'Our clinic hours are 9 AM to 5 PM, Monday to Friday.'),
+            ('How do I book an appointment?', 'Please reply with "book appointment" to see available slots.'),
+            ('Where is the clinic located?', 'The clinic is located at 123 Health St, Wellness City.')
+        ]
+        c.executemany('INSERT INTO whatsapp_faq (question, answer) VALUES (?, ?)', sample_faqs)
+
+
+    # Create chatbot_faq table
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS chatbot_faq (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            question TEXT NOT NULL,
+            answer TEXT NOT NULL
+        )
+    ''')
+
+    # Populate chatbot_faq with sample FAQs if empty
+    cursor = c.execute('SELECT COUNT(*) FROM chatbot_faq')
+    if cursor.fetchone()[0] == 0:
+        sample_faqs = [
+            ('What are the clinic hours?', 'Our clinic hours are 9 AM to 5 PM, Monday to Friday.'),
+            ('How do I book an appointment?', 'I can help you book an appointment! Please provide your patient ID.'),
+            ('Where is the clinic located?', 'The clinic is located at 123 Health St, Wellness City.')
+        ]
+        c.executemany('INSERT INTO chatbot_faq (question, answer) VALUES (?, ?)', sample_faqs)
+
+        
+
+    # Create chatbot_conversations table with message_type column
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS chatbot_conversations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            message TEXT NOT NULL,
+            sender TEXT NOT NULL,
+            timestamp TEXT NOT NULL,
+            message_type TEXT NOT NULL, -- 'text', 'faq', 'booking', 'reminder', 'confirmation', 'error', 'ai_response', 'placeholder'
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+    ''')
+
+      # Create chatbot_patient_mappings table to store user-to-patient mappings
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS chatbot_patient_mappings (
+            user_id INTEGER PRIMARY KEY,
+            patient_id INTEGER NOT NULL,
+            timestamp TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users (id),
+            FOREIGN KEY (patient_id) REFERENCES patients (id)
+        )
+    ''')   
     
     # Tasks table
     c.execute('''

@@ -28,13 +28,20 @@ import re
 import requests
 import threading
 import psycopg2
-
+import time
 # Import the init_db function to create the database schema
 from init_db import init_db
+
+# Example using OpenAI API (requires `openai` package)
+from openai import OpenAI
+
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', 'your-openai-api-key-here')  # Replace with your actual key
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 
 # Add at the top of app.py, after imports
 db_lock = threading.Lock()
+
 
 app = Flask(__name__)
 app.secret_key = 'supersecretkey'
@@ -1943,7 +1950,6 @@ def whatsapp_tab():
 # Webhook to receive WhatsApp messages
 @app.route('/whatsapp/webhook', methods=['GET', 'POST'])
 def whatsapp_webhook():
-    
     if request.method == 'GET':
         verify_token = "mySecretToken"
         mode = request.args.get('hub.mode')
@@ -1966,17 +1972,19 @@ def whatsapp_webhook():
 
         # Find patient by WhatsApp number
         conn = get_db_connection()
-        patient = conn.execute('SELECT id FROM patients WHERE whatsapp_number = ?', (sender,)).fetchone()
+        cursor = conn.cursor()
+        patient = cursor.execute('SELECT id FROM patients WHERE whatsapp_number = ?', (sender,)).fetchone()
         if not patient:
             conn.close()
-            return jsonify({'error': 'Patient not found'}), 404
+            send_whatsapp_message(sender, "Please register with the clinic to use this service.")
+            return jsonify({'status': 'Patient not found'}), 404
 
         patient_id = patient['id']
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
         # Save message to database
-        conn.execute('INSERT INTO whatsapp_conversations (patient_id, message, sender, timestamp, message_type) VALUES (?, ?, ?, ?, ?)',
-                    (patient_id, text, 'patient', timestamp, 'text'))
+        cursor.execute('INSERT INTO whatsapp_conversations (patient_id, message, sender, timestamp, message_type) VALUES (?, ?, ?, ?, ?)',
+                      (patient_id, text, 'patient', timestamp, 'text'))
         conn.commit()
 
         # Emit new message event for real-time update
@@ -1989,46 +1997,86 @@ def whatsapp_webhook():
         # Process message based on content
         response_message = None
         response_type = 'text'
-        
+
         if is_urgent:
             socketio.emit('emergency_alert', {
                 'patient_id': patient_id,
                 'message': f"Urgent: Patient {patient_id} reported - {text}"
             })
             response_message = "This is an urgent message. The doctor has been notified and will contact you shortly."
-        
-        # Handle appointment scheduling
+
+
+        # Handle FAQs
+        cursor.execute('SELECT answer FROM whatsapp_faq WHERE LOWER(question) LIKE ?', (f'%{text.lower()}%',))
+        faq = cursor.fetchone()
+        if faq:
+            response_message = faq['answer']
+            response_type = 'faq'
+
+        # Handle appointment booking
         elif 'book appointment' in text.lower():
-            slots = suggest_appointment(patient_id).get_json().get('suggested_slots', [])
+            slots_response = requests.get(f'http://localhost:5000/suggest_appointment/{patient_id}')
+            slots = slots_response.json().get('suggested_slots', [])
             if slots:
-                response_message = "Available slots:\n" + "\n".join(slots[:3]) + "\nReply with the slot number (1-3) to book."
+                response_message = "Available slots:\n" + "\n".join(slots[:3]) + "\nReply with the slot number (1-3) to book (e.g., '1')."
+                response_type = 'booking'
             else:
                 response_message = "No available slots. Please try again later."
 
-        # Handle FAQs
-        elif any(keyword in text.lower() for keyword in ['hours', 'opening', 'closing']):
-            response_message = "Our clinic hours are 9 AM to 5 PM, Monday to Friday."
-            response_type = 'text'
+        # Confirm booking based on slot selection
+        elif text.lower() in ['1', '2', '3'] and 'booking' in [msg['message_type'] for msg in cursor.execute('SELECT message_type FROM whatsapp_conversations WHERE patient_id = ? ORDER BY timestamp DESC LIMIT 1', (patient_id,)).fetchall()]:
+            slots_response = requests.get(f'http://localhost:5000/suggest_appointment/{patient_id}')
+            slots = slots_response.json().get('suggested_slots', [])
+            slot_index = int(text) - 1
+            if 0 <= slot_index < len(slots):
+                selected_slot = slots[slot_index]
+                date, time = selected_slot.split(' ')
+                patient = cursor.execute('SELECT name, whatsapp_number FROM patients WHERE id = ?', (patient_id,)).fetchone()
+                doctor_id = session.get('user_id', 1)  # Default to doctor ID 1 if session unavailable
+                doctor = cursor.execute('SELECT name FROM doctors WHERE id = ?', (doctor_id,)).fetchone()
+                if doctor:
+                    cursor.execute('INSERT INTO appointments (patient_id, patient_name, doctor_id, doctor_name, date, time, reason, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                                  (patient_id, patient['name'], doctor_id, doctor['name'], date, time, 'WhatsApp Booking', 'Upcoming'))
+                    conn.commit()
+                    response_message = f"Appointment booked for {date} at {time} with {doctor['name']}."
+                    response_type = 'confirmation'
+                else:
+                    response_message = "Error: Doctor not found."
+            else:
+                response_message = "Invalid slot number. Please reply with a number between 1 and 3."
+
+        # Handle reminders
+        elif 'reminder' in text.lower():
+            cursor.execute('SELECT medications FROM patients WHERE id = ?', (patient_id,))
+            patient = cursor.fetchone()
+            if patient and patient['medications']:
+                reminder_message = f"Reminder: Take your {patient['medications']} today."
+                response_message = reminder_message
+                response_type = 'reminder'
+            else:
+                response_message = "No medications found to set a reminder for."
 
         # Handle symptoms or emergencies
-        elif any(keyword in text.lower() for keyword in ['fever', 'cough', 'pain', 'headache', 'emergency']):
+        elif is_urgent or any(keyword in text.lower() for keyword in ['fever', 'cough', 'pain', 'headache']):
             analysis = summarize_symptoms_ai(text)
             response_message = f"AI Analysis: {analysis['summary']}\nTriage: {analysis['triage']}"
             response_type = 'summary'
-            if analysis['triage'] == 'High':
+            if analysis['triage'] == 'High' or is_urgent:
                 socketio.emit('emergency_alert', {
                     'patient_id': patient_id,
                     'message': f"Emergency: {text} (Triage: {analysis['triage']})"
                 })
+                response_message += "\nThis is an urgent message. The doctor has been notified."
 
         # Default response
         else:
-            response_message = "Your message has been received. The doctor will respond soon."
+            response_message = "Your message has been forwarded to the doctor. You'll hear back soon."
 
         # Save bot response
-        conn.execute('INSERT INTO whatsapp_conversations (patient_id, message, sender, timestamp, message_type) VALUES (?, ?, ?, ?, ?)',
-                    (patient_id, response_message, 'bot', datetime.now().strftime('%Y-%m-%d %H:%M:%S'), response_type))
+        cursor.execute('INSERT INTO whatsapp_conversations (patient_id, message, sender, timestamp, message_type) VALUES (?, ?, ?, ?, ?)',
+                      (patient_id, response_message, 'bot', datetime.now().strftime('%Y-%m-%d %H:%M:%S'), response_type))
         conn.commit()
+        cursor.close()
         conn.close()
 
         # Send response via WhatsApp API
@@ -2038,7 +2086,6 @@ def whatsapp_webhook():
     except Exception as e:
         print(f"Error in webhook: {e}")
         return jsonify({'error': str(e)}), 500
-
 # Function to send a message via WhatsApp API
 # Function to send a message via WhatsApp API
 # def send_whatsapp_message(phone_number, message):
@@ -2264,9 +2311,6 @@ def summarize_symptoms_route():
 
 
 
-
-
-
 # Route to send test results
 @app.route('/whatsapp/send_test_result', methods=['POST'])
 def send_test_result():
@@ -2379,10 +2423,6 @@ def get_registered_numbers():
 #     conn.close()
 
 
-
-
-
-
 # Add WhatsApp-related tables and columns
 def init_whatsapp_tables():
     conn = get_db_connection()
@@ -2398,18 +2438,17 @@ def init_whatsapp_tables():
         except sqlite3.OperationalError as e:
             print(f"Error adding whatsapp_number column: {e}")
 
-    # Create whatsapp_conversations table
-    conn.execute('''
-        CREATE TABLE IF NOT EXISTS whatsapp_conversations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            patient_id INTEGER,
-            message TEXT NOT NULL,
-            sender TEXT NOT NULL, -- 'patient', 'doctor', or 'bot'
-            timestamp TEXT NOT NULL,
-            message_type TEXT NOT NULL, -- 'text', 'summary', 'result', 'reminder', 'emergency'
-            FOREIGN KEY (patient_id) REFERENCES patients (id)
-        )
-    ''')
+    # Add message_type column to chatbot_conversations if missing (for SQLite)
+    if 'RENDER' not in os.environ:
+        cursor = conn.execute("PRAGMA table_info(chatbot_conversations)")
+        columns = [row[1] for row in cursor.fetchall()]
+        if 'message_type' not in columns:
+            try:
+                conn.execute('ALTER TABLE chatbot_conversations ADD COLUMN message_type TEXT')
+                conn.execute("UPDATE chatbot_conversations SET message_type = 'text' WHERE message_type IS NULL")
+            except sqlite3.OperationalError as e:
+                print(f"Error adding message_type column to chatbot_conversations: {e}")
+
     conn.commit()
     conn.close()
 
@@ -2540,7 +2579,26 @@ def schedule_appointment():
         return jsonify({'error': str(e)}), 500
 
     
-
+def send_daily_reminders():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        patients = cursor.execute('SELECT id, name, medications, whatsapp_number FROM patients WHERE medications IS NOT NULL').fetchall()
+        for patient in patients:
+            if patient['whatsapp_number']:
+                reminder_message = f"Reminder: Take your {patient['medications']} today."
+                try:
+                    send_whatsapp_message(patient['whatsapp_number'], reminder_message)
+                    cursor.execute('INSERT INTO whatsapp_conversations (patient_id, message, sender, timestamp, message_type) VALUES (?, ?, ?, ?, ?)',
+                                  (patient['id'], reminder_message, 'bot', datetime.now().strftime('%Y-%m-%d %H:%M:%S'), 'reminder'))
+                except Exception as e:
+                    print(f"Failed to send reminder to patient {patient['id']}: {e}")
+        conn.commit()
+        cursor.close()
+        conn.close()
+        print("Daily reminders sent successfully")
+    except Exception as e:
+        print(f"Error sending daily reminders: {e}")
 
 def generate_soap_notes(text):
     # Simple NLP to extract SOAP components (Subjective, Objective, Assessment, Plan)
@@ -2880,6 +2938,498 @@ def patients():
 
 
 
+# Route to render the Dynamic Chatbot page
+@app.route('/dynamic_chatbot')
+def dynamic_chatbot():
+    if 'user_id' not in session:
+        print("User not logged in, redirecting to login")
+        return redirect(url_for('login'))
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        chat_history = cursor.execute('SELECT message, sender FROM chatbot_conversations WHERE user_id = ? ORDER BY timestamp ASC',
+                                    (session['user_id'],)).fetchall()
+        cursor.close()
+        conn.close()
+        print("Rendering dynamic_chatbot.html")
+        return render_template('dynamic_chatbot.html', chat_history=chat_history)
+    except Exception as e:
+        print(f"Error rendering Dynamic Chatbot page: {e}")
+        return jsonify({'error': 'Failed to load Dynamic Chatbot page'}), 500
+
+
+
+# SocketIO handler for dynamic chatbot messages
+#     try:
+#         message = data.get('message', '')
+#         if not message:
+#             emit('chat_response', {'error': 'No message provided'}, broadcast=False)
+#             return
+
+#         user_id = session.get('user_id')
+#         if not user_id:
+#             emit('chat_response', {'error': 'User not authenticated'}, broadcast=False)
+#             return
+
+#         conn = get_db_connection()
+#         cursor = conn.cursor()
+
+#         # Check for patient ID in the message (e.g., "My patient ID is 1")
+#         patient_id = session.get('chatbot_patient_id')
+#         if not patient_id:
+#             match = re.match(r'.*patient ID is (\d+)', message, re.IGNORECASE)
+#             if match:
+#                 patient_id = int(match.group(1))
+#                 session['chatbot_patient_id'] = patient_id
+#                 response = f"Patient ID {patient_id} set. How can I assist you?"
+#                 response_type = 'patient_id_set'
+#             else:
+#                 # Look for a patient associated with the user (e.g., if user_id matches a patient_id)
+#                 patient = cursor.execute('SELECT id, name FROM patients WHERE id = ?', (user_id,)).fetchone()
+#                 if patient:
+#                     patient_id = patient['id']
+#                     session['chatbot_patient_id'] = patient_id
+#                     response = f"Using your patient ID {patient_id}. How can I assist you?"
+#                     response_type = 'patient_id_set'
+#                 else:
+#                     response = "Please provide your patient ID to proceed (e.g., 'My patient ID is 1')."
+#                     response_type = 'patient_id_request'
+        
+
+#         # Handle FAQs
+#         elif 'book appointment' not in message.lower() and 'reminder' not in message.lower():
+#             cursor.execute('SELECT answer FROM chatbot_faq WHERE LOWER(question) LIKE ?', (f'%{message.lower()}%',))
+#             faq = cursor.fetchone()
+#         if faq:
+#             response = faq['answer']
+#             response_type = 'faq'
+
+#         # Handle appointment booking
+#         elif 'book appointment' in message.lower():
+#             # Check if patient ID is provided in session or message
+#             patient = cursor.execute('SELECT id, name FROM patients WHERE id = (SELECT id FROM patients WHERE id = ? LIMIT 1)', (user_id,)).fetchone()
+#             if not patient:
+#                 response = "Please provide your patient ID to book an appointment (e.g., 'My patient ID is 1')."
+#                 response_type = 'booking_request'
+#             else:
+#                 patient_id = patient['id']
+#                 slots_response = requests.get(f'http://localhost:5000/suggest_appointment/{patient_id}')
+#                 slots = slots_response.json().get('suggested_slots', [])
+#                 if slots:
+#                     response = "Available slots:\n" + "\n".join(slots[:3]) + "\nPlease select a slot number (1-3) to book (e.g., '1')."
+#                     response_type = 'booking'
+#                 else:
+#                     response = "No available slots. Please try again later."
+#                     response_type = 'booking'
+
+#         # Confirm booking based on slot selection
+#         elif message.lower() in ['1', '2', '3'] and 'booking' in [msg['message_type'] for msg in cursor.execute('SELECT message_type FROM chatbot_conversations WHERE user_id = ? ORDER BY timestamp DESC LIMIT 1', (user_id,)).fetchall()]:
+#             patient = cursor.execute('SELECT id, name FROM patients WHERE id = (SELECT id FROM patients WHERE id = ? LIMIT 1)', (user_id,)).fetchone()
+#             if patient:
+#                 patient_id = patient['id']
+#                 slots_response = requests.get(f'http://localhost:5000/suggest_appointment/{patient_id}')
+#                 slots = slots_response.json().get('suggested_slots', [])
+#                 slot_index = int(message) - 1
+#                 if 0 <= slot_index < len(slots):
+#                     selected_slot = slots[slot_index]
+#                     date, time = selected_slot.split(' ')
+#                     doctor_id = 1  # Default doctor; adjust based on logic
+#                     doctor = cursor.execute('SELECT name FROM doctors WHERE id = ?', (doctor_id,)).fetchone()
+#                     if doctor:
+#                         cursor.execute('INSERT INTO appointments (patient_id, patient_name, doctor_id, doctor_name, date, time, reason, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+#                                       (patient_id, patient['name'], doctor_id, doctor['name'], date, time, 'Chatbot Booking', 'Upcoming'))
+#                         conn.commit()
+#                         response = f"Appointment booked for {date} at {time} with {doctor['name']}."
+#                         response_type = 'confirmation'
+#                     else:
+#                         response = "Error: Doctor not found."
+#                         response_type = 'error'
+#                 else:
+#                     response = "Invalid slot number. Please select a number between 1 and 3."
+#                     response_type = 'booking'
+#             else:
+#                 response = "Please provide your patient ID to book an appointment (e.g., 'My patient ID is 1')."
+#                 response_type = 'booking_request'
+
+#         # Handle reminders
+#         elif 'reminder' in message.lower():
+#             patient = cursor.execute('SELECT id, name, medications FROM patients WHERE id = (SELECT id FROM patients WHERE id = ? LIMIT 1)', (user_id,)).fetchone()
+#             if patient and patient['medications']:
+#                 reminder_message = f"Reminder: Take your {patient['medications']} today."
+#                 response = reminder_message
+#                 response_type = 'reminder'
+#             else:
+#                 response = "No medications found to set a reminder for."
+#                 response_type = 'reminder'
+
+#         # Default to OpenAI API or placeholder response
+#         else:
+#             if OPENAI_API_KEY != 'your-openai-api-key':
+#                 try:
+#                     response = client.chat.completions.create(
+#                         model="gpt-3.5-turbo",
+#                         messages=[
+#                             {"role": "system", "content": "You are a medical assistant chatbot for a doctor dashboard. Provide helpful responses related to patient care, scheduling, and medical advice."},
+#                             {"role": "user", "content": message}
+#                         ],
+#                         max_tokens=150
+#                     ).choices[0].message.content
+#                     response_type = 'ai_response'
+#                 except Exception as api_error:
+#                     print(f"OpenAI API error: {api_error}")
+#                     response = "Bot: Sorry, I couldn't process your request due to an API error. Please try again later."
+#                     response_type = 'error'
+#             else:
+#                 response = f"Bot: I received your message: '{message}'. How can I assist you today?"
+#                 response_type = 'placeholder'
+
+#         # Save chat history
+#         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+#         cursor.execute('INSERT INTO chatbot_conversations (user_id, message, sender, timestamp, message_type) VALUES (?, ?, ?, ?, ?)',
+#                       (user_id, message, 'user', timestamp, 'text'))
+#         cursor.execute('INSERT INTO chatbot_conversations (user_id, message, sender, timestamp, message_type) VALUES (?, ?, ?, ?, ?)',
+#                       (user_id, response, 'bot', timestamp, response_type))
+#         conn.commit()
+#         cursor.close()
+#         conn.close()
+
+#         emit('chat_response', {'message': response}, broadcast=False)
+#         print(f"Chatbot responded: {response}")
+#     except Exception as e:
+#         print(f"Error handling chatbot message: {e}")
+#         emit('chat_response', {'error': str(e)}, broadcast=False)
+# @socketio.on('send_message')
+# def handle_send_message(data):
+#     try:
+#         message = data.get('message', '')
+#         if not message:
+#             emit('chat_response', {'error': 'No message provided'}, broadcast=False)
+#             return
+
+#         user_id = session.get('user_id')
+#         if not user_id:
+#             emit('chat_response', {'error': 'User not authenticated'}, broadcast=False)
+#             return
+
+#         conn = get_db_connection()
+#         cursor = conn.cursor()
+
+#         # Check for patient ID in the message (e.g., "My patient ID is 1")
+#         patient_id = session.get('chatbot_patient_id')
+#         if not patient_id:
+#             match = re.match(r'.*patient ID is (\d+)', message, re.IGNORECASE)
+#             if match:
+#                 patient_id = int(match.group(1))
+#                 session['chatbot_patient_id'] = patient_id
+#                 response = f"Patient ID {patient_id} set. How can I assist you?"
+#                 response_type = 'patient_id_set'
+#             else:
+#                 # Look for a patient associated with the user (e.g., if user_id matches a patient_id)
+#                 patient = cursor.execute('SELECT id, name FROM patients WHERE id = ?', (user_id,)).fetchone()
+#                 if patient:
+#                     patient_id = patient['id']
+#                     session['chatbot_patient_id'] = patient_id
+#                     response = f"Using your patient ID {patient_id}. How can I assist you?"
+#                     response_type = 'patient_id_set'
+#                 else:
+#                     response = "Please provide your patient ID to proceed (e.g., 'My patient ID is 1')."
+#                     response_type = 'patient_id_request'
+
+#         # Handle FAQs
+#         elif 'book appointment' not in message.lower() and 'reminder' not in message.lower():
+#             cursor.execute('SELECT answer FROM chatbot_faq WHERE LOWER(question) LIKE ?', (f'%{message.lower()}%',))
+#             faq = cursor.fetchone()
+#             if faq:
+#                 response = faq['answer']
+#                 response_type = 'faq'
+#             else:
+#                 # Default to OpenAI API or placeholder response
+#                 if OPENAI_API_KEY != 'your-openai-api-key':
+#                     try:
+#                         response = client.chat.completions.create(
+#                             model="gpt-3.5-turbo",
+#                             messages=[
+#                                 {"role": "system", "content": "You are a medical assistant chatbot for a doctor dashboard. Provide helpful responses related to patient care, scheduling, and medical advice."},
+#                                 {"role": "user", "content": message}
+#                             ],
+#                             max_tokens=150
+#                         ).choices[0].message.content
+#                         response_type = 'ai_response'
+#                     except Exception as api_error:
+#                         print(f"OpenAI API error: {api_error}")
+#                         response = "Bot: Sorry, I couldn't process your request due to an API error. Please try again later."
+#                         response_type = 'error'
+#                 else:
+#                     response = f"Bot: I received your message: '{message}'. How can I assist you today?"
+#                     response_type = 'placeholder'
+
+#         # Handle appointment booking
+#         elif 'book appointment' in message.lower():
+#             patient = cursor.execute('SELECT id, name FROM patients WHERE id = ?', (patient_id,)).fetchone()
+#             if not patient:
+#                 response = "Invalid patient ID. Please provide a valid patient ID (e.g., 'My patient ID is 1')."
+#                 response_type = 'error'
+#                 session.pop('chatbot_patient_id', None)  # Clear invalid patient ID
+#             else:
+#                 slots_response = requests.get(f'http://localhost:5000/suggest_appointment/{patient_id}')
+#                 slots = slots_response.json().get('suggested_slots', [])
+#                 if slots:
+#                     response = "Available slots:\n" + "\n".join(slots[:3]) + "\nPlease select a slot number (1-3) to book (e.g., '1')."
+#                     response_type = 'booking'
+#                     session['chatbot_booking_slots'] = slots  # Store slots in session for confirmation
+#                 else:
+#                     response = "No available slots. Please try again later."
+#                     response_type = 'booking'
+
+#         # Confirm booking based on slot selection
+#         elif message.lower() in ['1', '2', '3'] and 'booking' in [msg['message_type'] for msg in cursor.execute('SELECT message_type FROM chatbot_conversations WHERE user_id = ? ORDER BY timestamp DESC LIMIT 1', (user_id,)).fetchall()]:
+#             slots = session.get('chatbot_booking_slots', [])
+#             if not slots:
+#                 response = "Booking session expired. Please start again by saying 'book appointment'."
+#                 response_type = 'error'
+#             else:
+#                 slot_index = int(message) - 1
+#                 if 0 <= slot_index < len(slots):
+#                     selected_slot = slots[slot_index]
+#                     date, time = selected_slot.split(' ')
+#                     patient = cursor.execute('SELECT id, name FROM patients WHERE id = ?', (patient_id,)).fetchone()
+#                     doctor_id = 1  # Default doctor; adjust based on logic
+#                     doctor = cursor.execute('SELECT name FROM doctors WHERE id = ?', (doctor_id,)).fetchone()
+#                     if doctor:
+#                         cursor.execute('INSERT INTO appointments (patient_id, patient_name, doctor_id, doctor_name, date, time, reason, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+#                                       (patient_id, patient['name'], doctor_id, doctor['name'], date, time, 'Chatbot Booking', 'Upcoming'))
+#                         conn.commit()
+#                         response = f"Appointment booked for {date} at {time} with {doctor['name']}."
+#                         response_type = 'confirmation'
+#                         session.pop('chatbot_booking_slots', None)  # Clear slots after booking
+#                     else:
+#                         response = "Error: Doctor not found."
+#                         response_type = 'error'
+#                 else:
+#                     response = "Invalid slot number. Please select a number between 1 and 3."
+#                     response_type = 'booking'
+
+#         # Handle reminders
+#         elif 'reminder' in message.lower():
+#             patient = cursor.execute('SELECT id, name, medications FROM patients WHERE id = ?', (patient_id,)).fetchone()
+#             if patient:
+#                 if patient['medications']:
+#                     reminder_message = f"Reminder: Take your {patient['medications']} today."
+#                     response = reminder_message
+#                     response_type = 'reminder'
+#                 else:
+#                     response = "No medications found to set a reminder for."
+#                     response_type = 'reminder'
+#             else:
+#                 response = "Invalid patient ID. Please provide a valid patient ID (e.g., 'My patient ID is 1')."
+#                 response_type = 'error'
+#                 session.pop('chatbot_patient_id', None)  # Clear invalid patient ID
+
+#         # Save chat history
+#         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+#         cursor.execute('INSERT INTO chatbot_conversations (user_id, message, sender, timestamp, message_type) VALUES (?, ?, ?, ?, ?)',
+#                       (user_id, message, 'user', timestamp, 'text'))
+#         cursor.execute('INSERT INTO chatbot_conversations (user_id, message, sender, timestamp, message_type) VALUES (?, ?, ?, ?, ?)',
+#                       (user_id, response, 'bot', timestamp, response_type))
+#         conn.commit()
+#         cursor.close()
+#         conn.close()
+
+#         emit('chat_response', {'message': response}, broadcast=False)
+#         print(f"Chatbot responded: {response}")
+#     except Exception as e:
+#         print(f"Error handling chatbot message: {e}")
+#         emit('chat_response', {'error': str(e)}, broadcast=False)
+
+@socketio.on('send_message')
+def handle_send_message(data):
+    try:
+        message = data.get('message', '')
+        if not message:
+            emit('chat_response', {'error': 'No message provided'}, broadcast=False)
+            return
+
+        user_id = session.get('user_id')
+        if not user_id:
+            emit('chat_response', {'error': 'User not authenticated'}, broadcast=False)
+            return
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Get patient ID from chatbot_patient_mappings
+        cursor.execute('SELECT patient_id FROM chatbot_patient_mappings WHERE user_id = ?', (user_id,))
+        mapping = cursor.fetchone()
+        patient_id = mapping['patient_id'] if mapping else None
+
+        # Handle patient ID change or reset
+        if 'change patient id' in message.lower():
+            cursor.execute('DELETE FROM chatbot_patient_mappings WHERE user_id = ?', (user_id,))
+            conn.commit()
+            response = "Patient ID cleared. Please provide a new patient ID (e.g., 'My patient ID is 1')."
+            response_type = 'patient_id_reset'
+        elif 'reset patient id' in message.lower():
+            cursor.execute('DELETE FROM chatbot_patient_mappings WHERE user_id = ?', (user_id,))
+            conn.commit()
+            session.pop('chatbot_booking_slots', None)  # Clear any booking context
+            session.pop('chatbot_doctors', None)  # Clear doctor selection context
+            response = "Patient ID and booking context reset. Please provide a new patient ID (e.g., 'My patient ID is 1')."
+            response_type = 'patient_id_reset'
+        # Check for patient ID in the message (e.g., "My patient ID is 1")
+        elif not patient_id:
+            match = re.match(r'.*patient ID is (\d+)', message, re.IGNORECASE)
+            if match:
+                patient_id = int(match.group(1))
+                cursor.execute('INSERT OR REPLACE INTO chatbot_patient_mappings (user_id, patient_id, timestamp) VALUES (?, ?, ?)',
+                              (user_id, patient_id, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+                conn.commit()
+                response = f"Patient ID {patient_id} set. How can I assist you?"
+                response_type = 'patient_id_set'
+            else:
+                # Look for a patient associated with the user (e.g., if user_id matches a patient_id)
+                patient = cursor.execute('SELECT id, name FROM patients WHERE id = ?', (user_id,)).fetchone()
+                if patient:
+                    patient_id = patient['id']
+                    cursor.execute('INSERT OR REPLACE INTO chatbot_patient_mappings (user_id, patient_id, timestamp) VALUES (?, ?, ?)',
+                                  (user_id, patient_id, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+                    conn.commit()
+                    response = f"Using your patient ID {patient_id}. How can I assist you?"
+                    response_type = 'patient_id_set'
+                else:
+                    response = "Please provide your patient ID to proceed (e.g., 'My patient ID is 1')."
+                    response_type = 'patient_id_request'
+
+        # Handle FAQs
+        elif 'book appointment' not in message.lower() and 'reminder' not in message.lower():
+            cursor.execute('SELECT answer FROM chatbot_faq WHERE LOWER(question) LIKE ?', (f'%{message.lower()}%',))
+            faq = cursor.fetchone()
+            if faq:
+                response = faq['answer']
+                response_type = 'faq'
+            else:
+                # Default to OpenAI API or placeholder response
+                if OPENAI_API_KEY != 'your-openai-api-key':
+                    try:
+                        response = client.chat.completions.create(
+                            model="gpt-3.5-turbo",
+                            messages=[
+                                {"role": "system", "content": "You are a medical assistant chatbot for a doctor dashboard. Provide helpful responses related to patient care, scheduling, and medical advice."},
+                                {"role": "user", "content": message}
+                            ],
+                            max_tokens=150
+                        ).choices[0].message.content
+                        response_type = 'ai_response'
+                    except Exception as api_error:
+                        print(f"OpenAI API error: {api_error}")
+                        response = "Bot: Sorry, I couldn't process your request due to an API error. Please try again later."
+                        response_type = 'error'
+                else:
+                    response = f"Bot: I received your message: '{message}'. How can I assist you today?"
+                    response_type = 'placeholder'
+
+        # Handle appointment booking
+        elif 'book appointment' in message.lower():
+            patient = cursor.execute('SELECT id, name FROM patients WHERE id = ?', (patient_id,)).fetchone()
+            if not patient:
+                response = "Invalid patient ID. Please provide a valid patient ID (e.g., 'My patient ID is 1')."
+                response_type = 'error'
+                cursor.execute('DELETE FROM chatbot_patient_mappings WHERE user_id = ?', (user_id,))
+                conn.commit()
+            else:
+                # Get list of doctors for selection
+                doctors = cursor.execute('SELECT id, name FROM doctors').fetchall()
+                if doctors:
+                    response = "Please select a doctor:\n" + "\n".join([f"{i+1}. {doctor['name']}" for i, doctor in enumerate(doctors)]) + "\nReply with the doctor number (e.g., '1')."
+                    response_type = 'doctor_selection'
+                    session['chatbot_doctors'] = [doctor['id'] for doctor in doctors]
+                else:
+                    response = "No doctors available. Please try again later."
+                    response_type = 'error'
+
+        # Handle doctor selection
+        elif message.lower() in [str(i) for i in range(1, 10)] and 'doctor_selection' in [msg['message_type'] for msg in cursor.execute('SELECT message_type FROM chatbot_conversations WHERE user_id = ? ORDER BY timestamp DESC LIMIT 1', (user_id,)).fetchall()]:
+            doctors = session.get('chatbot_doctors', [])
+            doctor_index = int(message) - 1
+            if 0 <= doctor_index < len(doctors):
+                doctor_id = doctors[doctor_index]
+                session['chatbot_selected_doctor'] = doctor_id
+                start_date = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d')
+                slots = get_doctor_availability(doctor_id, start_date)
+                if slots:
+                    response = "Available slots:\n" + "\n".join(slots[:3]) + "\nPlease select a slot number (1-3) to book (e.g., '1')."
+                    response_type = 'booking'
+                    session['chatbot_booking_slots'] = slots
+                else:
+                    response = "No available slots for this doctor. Please try again later."
+                    response_type = 'booking'
+            else:
+                response = "Invalid doctor number. Please select a number from the list."
+                response_type = 'doctor_selection'
+
+        # Confirm booking based on slot selection
+        elif message.lower() in ['1', '2', '3'] and 'booking' in [msg['message_type'] for msg in cursor.execute('SELECT message_type FROM chatbot_conversations WHERE user_id = ? ORDER BY timestamp DESC LIMIT 1', (user_id,)).fetchall()]:
+            slots = session.get('chatbot_booking_slots', [])
+            doctor_id = session.get('chatbot_selected_doctor')
+            if not slots or not doctor_id:
+                response = "Booking session expired. Please start again by saying 'book appointment'."
+                response_type = 'error'
+            else:
+                slot_index = int(message) - 1
+                if 0 <= slot_index < len(slots):
+                    selected_slot = slots[slot_index]
+                    date, time = selected_slot.split(' ')
+                    patient = cursor.execute('SELECT id, name FROM patients WHERE id = ?', (patient_id,)).fetchone()
+                    doctor = cursor.execute('SELECT name FROM doctors WHERE id = ?', (doctor_id,)).fetchone()
+                    if doctor:
+                        cursor.execute('INSERT INTO appointments (patient_id, patient_name, doctor_id, doctor_name, date, time, reason, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                                      (patient_id, patient['name'], doctor_id, doctor['name'], date, time, 'Chatbot Booking', 'Upcoming'))
+                        conn.commit()
+                        response = f"Appointment booked for {date} at {time} with {doctor['name']}."
+                        response_type = 'confirmation'
+                        session.pop('chatbot_booking_slots', None)
+                        session.pop('chatbot_selected_doctor', None)
+                        session.pop('chatbot_doctors', None)
+                    else:
+                        response = "Error: Doctor not found."
+                        response_type = 'error'
+                else:
+                    response = "Invalid slot number. Please select a number between 1 and 3."
+                    response_type = 'booking'
+
+        # Handle reminders
+        elif 'reminder' in message.lower():
+            patient = cursor.execute('SELECT id, name, medications FROM patients WHERE id = ?', (patient_id,)).fetchone()
+            if patient:
+                if patient['medications']:
+                    reminder_message = f"Reminder: Take your {patient['medications']} today. Daily reminders are scheduled at 9:00 AM via WhatsApp."
+                    response = reminder_message
+                    response_type = 'reminder'
+                else:
+                    response = "No medications found to set a reminder for."
+                    response_type = 'reminder'
+            else:
+                response = "Invalid patient ID. Please provide a valid patient ID (e.g., 'My patient ID is 1')."
+                response_type = 'error'
+                cursor.execute('DELETE FROM chatbot_patient_mappings WHERE user_id = ?', (user_id,))
+                conn.commit()
+
+        # Save chat history
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        cursor.execute('INSERT INTO chatbot_conversations (user_id, message, sender, timestamp, message_type) VALUES (?, ?, ?, ?, ?)',
+                      (user_id, message, 'user', timestamp, 'text'))
+        cursor.execute('INSERT INTO chatbot_conversations (user_id, message, sender, timestamp, message_type) VALUES (?, ?, ?, ?, ?)',
+                      (user_id, response, 'bot', timestamp, response_type))
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        emit('chat_response', {'message': response}, broadcast=False)
+        print(f"Chatbot responded: {response}")
+    except Exception as e:
+        print(f"Error handling chatbot message: {e}")
+        emit('chat_response', {'error': str(e)}, broadcast=False)
+
+
 @socketio.on('connect')
 def handle_connect():
     print("Client connected")
@@ -2889,4 +3439,16 @@ def handle_disconnect():
     print("Client disconnected")
 
 if __name__ == '__main__':
+    # socketio.run(app, debug=True)
+    # Schedule daily reminders at 9:00 AM
+    schedule.every().day.at("09:00").do(send_daily_reminders)
+
+    # Start the scheduler in a separate thread
+    def run_scheduler():
+        while True:
+            schedule.run_pending()
+            time.sleep(60)  # Check every minute
+    scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
+    scheduler_thread.start()
+
     socketio.run(app, debug=True)
