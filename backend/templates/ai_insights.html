@@ -3,12 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Insights</title>
+    <title>Doctor Dashboard - AI Insights</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <script src="{{ url_for('static', filename='js/socket.io.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='lib/fullcalendar/fullcalendar.min.css') }}">
+    <script src="{{ url_for('static', filename='lib/fullcalendar/fullcalendar.min.js') }}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
     <style>
         :root {
             --royal-blue: #2563EB;
@@ -128,7 +131,7 @@
 
         a {
             color: var(--teal-highlight);
-            text-decoration: underline;
+            /* text-decoration: underline; */
             transition: color 0.3s ease;
         }
 
@@ -211,6 +214,16 @@
                 <h3 class="text-lg sm:text-xl font-semibold text-blue-800 mb-3">Patient Notes</h3>
                 <ul id="patient-notes" class="space-y-2 text-gray-800 text-sm sm:text-base"></ul>
             </div>
+            <div class="gold-divider mb-4 sm:mb-6"></div>
+            <div id="ehr-summary" class="ivory-bg rounded-xl p-4 sm:p-6 shadow-lg ai-card transition-transform duration-300 border border-yellow-300" role="article" aria-label="Patient Notes">
+                <h3 class="text-lg sm:text-xl font-semibold text-blue-800 mb-3">Patient Summary</h3>
+                <h4 class="text-md font-semibold text-gray-700 mb-1">Vitals Chart</h4>
+                <canvas id="patient-summary-chart" class="w-full h-40"></canvas>
+                <ul id="patient-notes" class="space-y-2 text-gray-800 text-sm sm:text-base"></ul>
+                <h4 class="text-lg sm:text-xl font-semibold text-blue-800 mb-3">EHR Overview</h4>
+                <ul id="ehr-summary-list" class="list-disc pl-5 text-gray-600"></ul>
+            </div>
+           
             <div class="relative">
                 <!-- Core Clinical Tasks -->
                 <h3 class="section-header">Core Clinical Tasks</h3>

@@ -1240,8 +1240,336 @@ function initializeCalendar() {
 }
 
 
+
+
 // ***************Fetch all AI-driven insights (for AI Insights page or dashboard page if applicable)*****************************
 // Fetch all AI-driven insights
+// function loadAllAIInsights(patientId) {
+//     if (!patientId || isNaN(patientId)) {
+//         console.warn("Invalid or missing patientId:", patientId);
+//         ['suggested-appointments', 'health-trends', 'risk-clusters', 'no-show-predictions', 'follow-up-recommendations', 'med-interactions', 'vitals-alerts', 'resource-allocation', 'patient-sentiment', 'appointment-priority', 'follow-up-reminder', 'health-risk-prediction', 'triage-tasks', 'image-analysis', 'unified-data', 'wearable-monitoring', 'compliance-check', 'personalized-plan'].forEach(id => {
+//             const element = document.getElementById(id);
+//             if (element) {
+//                 element.innerHTML = '<li>Please select a valid patient</li>';
+//             } else {
+//                 console.warn(`Element with id '${id}' not found in DOM. Ensure <ul id="${id}"> exists in ai_insights.html.`);
+//             }
+//         });
+//         return;
+//     }
+
+//     console.log(`Fetching AI insights for patientId: ${patientId}`);
+//     fetch(`/all_ai_insights/${patientId}`, { 
+//         credentials: 'include',
+//         headers: {
+//             'Accept': 'application/json'
+//         }
+//     })
+//         .then(response => {
+//             console.log(`Response status for /all_ai_insights/${patientId}: ${response.status}`);
+//             if (!response.ok) {
+//                 return response.text().then(text => {
+//                     throw new Error(`Failed to fetch AI insights: ${response.status} ${response.statusText} - ${text}`);
+//                 });
+//             }
+//             return response.json();
+//         })
+//         .then(data => {
+//             console.log("AI insights fetched:", data);
+
+
+
+
+//             // Patient Notes from Transcription
+//             const notesList = document.getElementById('patient-notes');
+//             if (notesList) {
+//                 fetch(`/api/patient_notes/${patientId}`, { credentials: 'include' })
+//                     .then(response => {
+//                         if (!response.ok) {
+//                             return response.json().then(err => {
+//                                 throw new Error(err.error || `Failed to fetch patient notes (Status: ${response.status})`);
+//                             });
+//                         }
+//                         return response.json();
+//                     })
+//                     .then(data => {
+//                         if (data && data.length > 0) {
+//                             // notesList.innerHTML = data.map(note => `<li>${note.date}: ${note.note}</li>`).join('');
+//                             notesList.innerHTML = data.map(note => `<li>${note.created_at || 'No date available'}: ${note.note}</li>`).join('');
+//                         } else {
+//                             notesList.innerHTML = '<li>No notes available</li>';
+//                         }
+//                     })
+//                     .catch(error => {
+//                         console.error("Error fetching patient notes:", error.message);
+//                         notesList.innerHTML = `<li>Error loading notes: ${error.message}</li>`;
+//                     });
+//             } else {
+//                 console.warn("Patient notes element not found. Ensure <ul id='patient-notes'> exists in ai_insights.html.");
+//             }
+
+
+
+//             // Suggested Appointments
+//             const apptList = document.getElementById('suggested-appointments');
+//             if (apptList) {
+//                 if (data.suggested_appointments && data.suggested_appointments.suggested_slots && data.suggested_appointments.suggested_slots.length > 0) {
+//                     apptList.innerHTML = data.suggested_appointments.suggested_slots.map(slot => `<li>${slot}</li>`).join('');
+//                 } else {
+//                     apptList.innerHTML = `<li>${data.suggested_appointments && data.suggested_appointments.error ? data.suggested_appointments.error : 'No suggestions available'}</li>`;
+//                 }
+//             } else {
+//                 console.warn("Suggested appointments element not found. Ensure <ul id='suggested-appointments'> exists in ai_insights.html.");
+//             }
+
+//             // Health Trends
+//             const trendsList = document.getElementById('health-trends');
+//             if (trendsList) {
+//                 if (data.health_trends && data.health_trends.trends && data.health_trends.trends.risk) {
+//                     trendsList.innerHTML = `<li>Risk: ${data.health_trends.trends.risk}</li>`;
+//                 } else {
+//                     trendsList.innerHTML = `<li>${data.health_trends && data.health_trends.error ? data.health_trends.error : 'No trends available'}</li>`;
+//                 }
+//             } else {
+//                 console.warn("Health trends element not found. Ensure <ul id='health-trends'> exists in ai_insights.html.");
+//             }
+
+//             // Patient Risk Clusters
+//             const clustersList = document.getElementById('risk-clusters');
+//             if (clustersList) {
+//                 if (data.risk_clusters && data.risk_clusters.clusters && data.risk_clusters.clusters.length > 0) {
+//                     clustersList.innerHTML = data.risk_clusters.clusters.map(c => `<li>${c.name}: ${c.cluster_label}</li>`).join('');
+//                 } else {
+//                     clustersList.innerHTML = `<li>${data.risk_clusters && data.risk_clusters.error ? data.risk_clusters.error : 'No clusters available'}</li>`;
+//                 }
+//             } else {
+//                 console.warn("Risk clusters element not found. Ensure <ul id='risk-clusters'> exists in ai_insights.html.");
+//             }
+
+//             // No-Show Predictions
+//             const noShowList = document.getElementById('no-show-predictions');
+//             if (noShowList) {
+//                 if (data.no_show_prediction && data.no_show_prediction.no_show_probability !== undefined) {
+//                     noShowList.innerHTML = `<li>No-Show Probability: ${(data.no_show_prediction.no_show_probability * 100).toFixed(2)}%</li>`;
+//                 } else {
+//                     noShowList.innerHTML = `<li>${data.no_show_prediction && data.no_show_prediction.error ? data.no_show_prediction.error : 'No predictions available'}</li>`;
+//                 }
+//             } else {
+//                 console.warn("No-show predictions element not found. Ensure <ul id='no-show-predictions'> exists in ai_insights.html.");
+//             }
+
+//             // Follow-Up Recommendations
+//             const followUpList = document.getElementById('follow-up-recommendations');
+//             if (followUpList) {
+//                 if (data.follow_up_recommendations && data.follow_up_recommendations.recommendation && data.follow_up_recommendations.recommendation.follow_up) {
+//                     followUpList.innerHTML = `<li>${data.follow_up_recommendations.recommendation.follow_up}</li>`;
+//                 } else {
+//                     followUpList.innerHTML = `<li>${data.follow_up_recommendations && data.follow_up_recommendations.error ? data.follow_up_recommendations.error : 'No recommendations available'}</li>`;
+//                 }
+//             } else {
+//                 console.warn("Follow-up recommendations element not found. Ensure <ul id='follow-up-recommendations'> exists in ai_insights.html.");
+//             }
+
+//             // Medication Interactions
+//             const medList = document.getElementById('med-interactions');
+//             if (medList) {
+//                 if (data.med_interactions && data.med_interactions.interactions && data.med_interactions.interactions.length > 0) {
+//                     medList.innerHTML = data.med_interactions.interactions.map(i => `<li>${i.medications.join(' + ')}: ${i.warning}</li>`).join('');
+//                 } else {
+//                     medList.innerHTML = `<li>${data.med_interactions && data.med_interactions.error ? data.med_interactions.error : 'No interactions detected'}</li>`;
+//                 }
+//             } else {
+//                 console.warn("Medication interactions element not found. Ensure <ul id='med-interactions'> exists in ai_insights.html.");
+//             }
+
+//             // Real-Time Vitals Alerts
+//             const vitalsList = document.getElementById('vitals-alerts');
+//             if (vitalsList) {
+//                 if (data.vitals_alerts && data.vitals_alerts.alerts && data.vitals_alerts.alerts.length > 0) {
+//                     vitalsList.innerHTML = data.vitals_alerts.alerts.map(alert => `<li>${alert}</li>`).join('');
+//                 } else {
+//                     vitalsList.innerHTML = `<li>${data.vitals_alerts && data.vitals_alerts.error ? data.vitals_alerts.error : 'No active alerts'}</li>`;
+//                 }
+//             } else {
+//                 console.warn("Vitals alerts element not found. Ensure <ul id='vitals-alerts'> exists in ai_insights.html.");
+//             }
+
+//             // Resource Allocation
+//             const resourceList = document.getElementById('resource-allocation');
+//             if (resourceList) {
+//                 if (data.resource_allocation && data.resource_allocation.recommendations && data.resource_allocation.recommendations.length > 0) {
+//                     resourceList.innerHTML = data.resource_allocation.recommendations.map(r => `<li>${r.date}: ${r.staff_needed} staff, ${r.equipment_needed} equipment</li>`).join('');
+//                 } else {
+//                     resourceList.innerHTML = `<li>${data.resource_allocation && data.resource_allocation.error ? data.resource_allocation.error : 'No recommendations available'}</li>`;
+//                 }
+//             } else {
+//                 console.warn("Resource allocation element not found. Ensure <ul id='resource-allocation'> exists in ai_insights.html.");
+//             }
+
+//             // Patient Sentiment
+//             const sentimentList = document.getElementById('patient-sentiment');
+//             if (sentimentList) {
+//                 if (data.patient_sentiment && data.patient_sentiment.sentiment) {
+//                     sentimentList.innerHTML = `<li>Sentiment: ${data.patient_sentiment.sentiment} (Confidence: ${(data.patient_sentiment.confidence * 100).toFixed(2)}%)</li>`;
+//                 } else {
+//                     sentimentList.innerHTML = `<li>${data.patient_sentiment && data.patient_sentiment.error ? data.patient_sentiment.error : 'No sentiment available'}</li>`;
+//                 }
+//             } else {
+//                 console.warn("Patient sentiment element not found. Ensure <ul id='patient-sentiment'> exists in ai_insights.html.");
+//             }
+
+//             // Appointment Priority
+//             const priorityList = document.getElementById('appointment-priority');
+//             if (priorityList) {
+//                 if (data.appointment_priority && data.appointment_priority.priority_level) {
+//                     priorityList.innerHTML = `<li>Priority: ${data.appointment_priority.priority_level} (Score: ${data.appointment_priority.priority_score.toFixed(2)})</li>`;
+//                 } else {
+//                     priorityList.innerHTML = `<li>${data.appointment_priority && data.appointment_priority.error ? data.appointment_priority.error : 'No priority available'}</li>`;
+//                 }
+//             } else {
+//                 console.warn("Appointment priority element not found. Ensure <ul id='appointment-priority'> exists in ai_insights.html.");
+//             }
+
+//             // Follow-Up Reminder
+//             const reminderList = document.getElementById('follow-up-reminder');
+//             if (reminderList) {
+//                 if (data.follow_up_reminder && data.follow_up_reminder.reminder) {
+//                     reminderList.innerHTML = `<li>${data.follow_up_reminder.reminder}</li>`;
+//                 } else {
+//                     reminderList.innerHTML = `<li>${data.follow_up_reminder && data.follow_up_reminder.error ? data.follow_up_reminder.error : 'No reminder available'}</li>`;
+//                 }
+//             } else {
+//                 console.warn("Follow-up reminder element not found. Ensure <ul id='follow-up-reminder'> exists in ai_insights.html.");
+//             }
+
+//             // Patient Summary (Chart)
+//             const summaryCanvas = document.getElementById('patient-summary-chart');
+//             if (summaryCanvas && data.patient_summary && data.patient_summary.vitals) {
+//                 // Destroy existing chart instance if it exists
+//                 if (patientSummaryChartInstance) {
+//                     patientSummaryChartInstance.destroy();
+//                     patientSummaryChartInstance = null;
+//                 }
+//                 patientSummaryChartInstance = new Chart(summaryCanvas, {
+//                     type: 'line',
+//                     data: {
+//                         labels: data.patient_summary.labels || ['Latest'],
+//                         datasets: [{
+//                             label: 'Heart Rate',
+//                             data: data.patient_summary.vitals.map(v => v.heart_rate || 0),
+//                             borderColor: 'blue',
+//                             fill: false
+//                         }, {
+//                             label: 'Blood Pressure',
+//                             data: data.patient_summary.vitals.map(v => v.heart_rate || 0),
+//                             borderColor: 'red',
+//                             fill: false
+//                         }]
+//                     },
+//                     options: { responsive: true }
+//                 });
+//             } else {
+//                 console.warn("Patient summary chart element or data not found. Ensure <canvas id='patient-summary-chart'> exists in ai_insights.html.");
+//             }
+
+//             // Health Risk Prediction
+//             const riskList = document.getElementById('health-risk-prediction');
+//             if (riskList) {
+//                 if (data.health_risk_prediction && data.health_risk_prediction.alert) {
+//                     riskList.innerHTML = `<li>${data.health_risk_prediction.alert} (<a href="${data.health_risk_prediction.guideline}" target="_blank">Guideline</a>)</li>`;
+//                 } else {
+//                     riskList.innerHTML = `<li>${data.health_risk_prediction && data.health_risk_prediction.error ? data.health_risk_prediction.error : 'No risk alerts'}</li>`;
+//                 }
+//             } else {
+//                 console.warn("Health risk prediction element not found. Ensure <ul id='health-risk-prediction'> exists in ai_insights.html.");
+//             }
+
+//             // Triaged Tasks
+//             const triageList = document.getElementById('triage-tasks');
+//             if (triageList) {
+//                 if (data.triage_tasks && data.triage_tasks.triaged_tasks && data.triage_tasks.triaged_tasks.length > 0) {
+//                     triageList.innerHTML = data.triage_tasks.triaged_tasks.map(t => `<li>${t.description} (Score: ${t.triage_score.toFixed(2)})</li>`).join('');
+//                 } else {
+//                     triageList.innerHTML = `<li>${data.triage_tasks && data.triage_tasks.error ? data.triage_tasks.error : 'No triaged tasks'}</li>`;
+//                 }
+//             } else {
+//                 console.warn("Triage tasks element not found. Ensure <ul id='triage-tasks'> exists in ai_insights.html.");
+//             }
+
+//             // Image Analysis
+//             const imageList = document.getElementById('image-analysis');
+//             if (imageList) {
+//                 if (data.image_analysis && data.image_analysis.condition) {
+//                     imageList.innerHTML = `<li>${data.image_analysis.condition} (Confidence: ${(data.image_analysis.confidence * 100).toFixed(2)}%)</li>`;
+//                 } else {
+//                     imageList.innerHTML = `<li>${data.image_analysis && data.image_analysis.error ? data.image_analysis.error : 'No diagnosis available'}</li>`;
+//                 }
+//             } else {
+//                 console.warn("Image analysis element not found. Ensure <ul id='image-analysis'> exists in ai_insights.html.");
+//             }
+
+//             // Unified Data
+//             const unifiedList = document.getElementById('unified-data');
+//             if (unifiedList) {
+//                 if (data.unified_data && data.unified_data.ehr) {
+//                     unifiedList.innerHTML = `<li>EHR: ${data.unified_data.ehr.history}</li>`;
+//                 } else {
+//                     unifiedList.innerHTML = `<li>${data.unified_data && data.unified_data.error ? data.unified_data.error : 'No unified data'}</li>`;
+//                 }
+//             } else {
+//                 console.warn("Unified data element not found. Ensure <ul id='unified-data'> exists in ai_insights.html.");
+//             }
+
+//             // Wearable Monitoring
+//             const wearableList = document.getElementById('wearable-monitoring');
+//             if (wearableList) {
+//                 if (data.wearable_monitoring && data.wearable_monitoring.alert) {
+//                     wearableList.innerHTML = `<li>${data.wearable_monitoring.alert} (HR: ${data.wearable_monitoring.heart_rate})</li>`;
+//                 } else {
+//                     wearableList.innerHTML = `<li>${data.wearable_monitoring && data.wearable_monitoring.error ? data.wearable_monitoring.error : 'No wearable data'}</li>`;
+//                 }
+//             } else {
+//                 console.warn("Wearable monitoring element not found. Ensure <ul id='wearable-monitoring'> exists in ai_insights.html.");
+//             }
+
+//             // Compliance Check
+//             const complianceList = document.getElementById('compliance-check');
+//             if (complianceList) {
+//                 if (data.compliance_check && data.compliance_check.status) {
+//                     complianceList.innerHTML = `<li>${data.compliance_check.status} (Audit: ${data.compliance_check.audit_trail})</li>`;
+//                 } else {
+//                     complianceList.innerHTML = `<li>${data.compliance_check && data.compliance_check.error ? data.compliance_check.error : 'No compliance data'}</li>`;
+//                 }
+//             } else {
+//                 console.warn("Compliance check element not found. Ensure <ul id='compliance-check'> exists in ai_insights.html.");
+//             }
+
+//             // Personalized Plan
+//             const planList = document.getElementById('personalized-plan');
+//             if (planList) {
+//                 if (data.personalized_plan && data.personalized_plan.recommendations && data.personalized_plan.recommendations.length > 0) {
+//                     planList.innerHTML = data.personalized_plan.recommendations.map(r => `<li>${r}</li>`).join('');
+//                 } else {
+//                     planList.innerHTML = `<li>${data.personalized_plan && data.personalized_plan.error ? data.personalized_plan.error : 'No plan available'}</li>`;
+//                 }
+//             } else {
+//                 console.warn("Personalized plan element not found. Ensure <ul id='personalized-plan'> exists in ai_insights.html.");
+//             }
+//         })
+//         .catch(error => {
+//             console.error("Error fetching AI insights:", error.message);
+//             ['suggested-appointments', 'health-trends', 'risk-clusters', 'no-show-predictions', 'follow-up-recommendations', 'med-interactions', 'vitals-alerts', 'resource-allocation', 'patient-sentiment', 'appointment-priority', 'follow-up-reminder', 'health-risk-prediction', 'triage-tasks', 'image-analysis', 'unified-data', 'wearable-monitoring', 'compliance-check', 'personalized-plan'].forEach(id => {
+//                 const element = document.getElementById(id);
+//                 if (element) {
+//                     element.innerHTML = `<li>Error loading data: ${error.message}</li>`;
+//                 } else {
+//                     console.warn(`Element with id '${id}' not found in DOM. Ensure <ul id="${id}"> exists in ai_insights.html.`);
+//                 }
+//             });
+//         });
+// }
+
+
 function loadAllAIInsights(patientId) {
     if (!patientId || isNaN(patientId)) {
         console.warn("Invalid or missing patientId:", patientId);
@@ -1255,13 +1583,10 @@ function loadAllAIInsights(patientId) {
         });
         return;
     }
-
     console.log(`Fetching AI insights for patientId: ${patientId}`);
     fetch(`/all_ai_insights/${patientId}`, { 
         credentials: 'include',
-        headers: {
-            'Accept': 'application/json'
-        }
+        headers: { 'Accept': 'application/json' }
     })
         .then(response => {
             console.log(`Response status for /all_ai_insights/${patientId}: ${response.status}`);
@@ -1274,10 +1599,6 @@ function loadAllAIInsights(patientId) {
         })
         .then(data => {
             console.log("AI insights fetched:", data);
-
-
-
-
             // Patient Notes from Transcription
             const notesList = document.getElementById('patient-notes');
             if (notesList) {
@@ -1292,7 +1613,6 @@ function loadAllAIInsights(patientId) {
                     })
                     .then(data => {
                         if (data && data.length > 0) {
-                            // notesList.innerHTML = data.map(note => `<li>${note.date}: ${note.note}</li>`).join('');
                             notesList.innerHTML = data.map(note => `<li>${note.created_at || 'No date available'}: ${note.note}</li>`).join('');
                         } else {
                             notesList.innerHTML = '<li>No notes available</li>';
@@ -1305,9 +1625,32 @@ function loadAllAIInsights(patientId) {
             } else {
                 console.warn("Patient notes element not found. Ensure <ul id='patient-notes'> exists in ai_insights.html.");
             }
-
-
-
+            // Structured Medical Notes (SOAP)
+            const medicalNotesList = document.getElementById('medical-notes');
+            if (medicalNotesList) {
+                fetch(`/medical_notes/${patientId}`, { credentials: 'include' })
+                    .then(response => {
+                        if (!response.ok) throw new Error('Failed to fetch medical notes');
+                        return response.json();
+                    })
+                    .then(notes => {
+                        medicalNotesList.innerHTML = notes.length === 0
+                            ? '<p class="text-gray-500">No structured medical notes found.</p>'
+                            : notes.map(note => `
+                                <div class="p-2 bg-gray-100 rounded mb-2">
+                                    <p><strong>Created At:</strong> ${note.created_at}</p>
+                                    <p><strong>Subjective:</strong> ${note.subjective}</p>
+                                    <p><strong>Objective:</strong> ${note.objective}</p>
+                                    <p><strong>Assessment:</strong> ${note.assessment}</p>
+                                    <p><strong>Plan:</strong> ${note.plan}</p>
+                                </div>
+                            `).join('');
+                    })
+                    .catch(error => {
+                        console.error("Error fetching medical notes:", error.message);
+                        medicalNotesList.innerHTML = `<p class="text-gray-500">Error loading structured notes: ${error.message}</p>`;
+                    });
+            }
             // Suggested Appointments
             const apptList = document.getElementById('suggested-appointments');
             if (apptList) {
@@ -1319,7 +1662,6 @@ function loadAllAIInsights(patientId) {
             } else {
                 console.warn("Suggested appointments element not found. Ensure <ul id='suggested-appointments'> exists in ai_insights.html.");
             }
-
             // Health Trends
             const trendsList = document.getElementById('health-trends');
             if (trendsList) {
@@ -1331,7 +1673,6 @@ function loadAllAIInsights(patientId) {
             } else {
                 console.warn("Health trends element not found. Ensure <ul id='health-trends'> exists in ai_insights.html.");
             }
-
             // Patient Risk Clusters
             const clustersList = document.getElementById('risk-clusters');
             if (clustersList) {
@@ -1343,7 +1684,6 @@ function loadAllAIInsights(patientId) {
             } else {
                 console.warn("Risk clusters element not found. Ensure <ul id='risk-clusters'> exists in ai_insights.html.");
             }
-
             // No-Show Predictions
             const noShowList = document.getElementById('no-show-predictions');
             if (noShowList) {
@@ -1355,7 +1695,6 @@ function loadAllAIInsights(patientId) {
             } else {
                 console.warn("No-show predictions element not found. Ensure <ul id='no-show-predictions'> exists in ai_insights.html.");
             }
-
             // Follow-Up Recommendations
             const followUpList = document.getElementById('follow-up-recommendations');
             if (followUpList) {
@@ -1367,7 +1706,6 @@ function loadAllAIInsights(patientId) {
             } else {
                 console.warn("Follow-up recommendations element not found. Ensure <ul id='follow-up-recommendations'> exists in ai_insights.html.");
             }
-
             // Medication Interactions
             const medList = document.getElementById('med-interactions');
             if (medList) {
@@ -1379,7 +1717,6 @@ function loadAllAIInsights(patientId) {
             } else {
                 console.warn("Medication interactions element not found. Ensure <ul id='med-interactions'> exists in ai_insights.html.");
             }
-
             // Real-Time Vitals Alerts
             const vitalsList = document.getElementById('vitals-alerts');
             if (vitalsList) {
@@ -1391,7 +1728,6 @@ function loadAllAIInsights(patientId) {
             } else {
                 console.warn("Vitals alerts element not found. Ensure <ul id='vitals-alerts'> exists in ai_insights.html.");
             }
-
             // Resource Allocation
             const resourceList = document.getElementById('resource-allocation');
             if (resourceList) {
@@ -1403,7 +1739,6 @@ function loadAllAIInsights(patientId) {
             } else {
                 console.warn("Resource allocation element not found. Ensure <ul id='resource-allocation'> exists in ai_insights.html.");
             }
-
             // Patient Sentiment
             const sentimentList = document.getElementById('patient-sentiment');
             if (sentimentList) {
@@ -1415,7 +1750,6 @@ function loadAllAIInsights(patientId) {
             } else {
                 console.warn("Patient sentiment element not found. Ensure <ul id='patient-sentiment'> exists in ai_insights.html.");
             }
-
             // Appointment Priority
             const priorityList = document.getElementById('appointment-priority');
             if (priorityList) {
@@ -1427,7 +1761,6 @@ function loadAllAIInsights(patientId) {
             } else {
                 console.warn("Appointment priority element not found. Ensure <ul id='appointment-priority'> exists in ai_insights.html.");
             }
-
             // Follow-Up Reminder
             const reminderList = document.getElementById('follow-up-reminder');
             if (reminderList) {
@@ -1439,10 +1772,11 @@ function loadAllAIInsights(patientId) {
             } else {
                 console.warn("Follow-up reminder element not found. Ensure <ul id='follow-up-reminder'> exists in ai_insights.html.");
             }
-
-            // Patient Summary (Chart)
+            // Patient Summary (Chart and Text)
+            // Patient Summary (Chart and Text)
             const summaryCanvas = document.getElementById('patient-summary-chart');
-            if (summaryCanvas && data.patient_summary && data.patient_summary.vitals) {
+            const ehrSummaryList = document.getElementById('ehr-summary-list');
+            if (summaryCanvas && ehrSummaryList && data.patient_summary && data.patient_summary.vitals) {
                 // Destroy existing chart instance if it exists
                 if (patientSummaryChartInstance) {
                     patientSummaryChartInstance.destroy();
@@ -1451,24 +1785,46 @@ function loadAllAIInsights(patientId) {
                 patientSummaryChartInstance = new Chart(summaryCanvas, {
                     type: 'line',
                     data: {
-                        labels: data.patient_summary.labels || ['Latest'],
+                        labels: data.patient_summary.vitals.labels || ['Latest'],
                         datasets: [{
                             label: 'Heart Rate',
-                            data: data.patient_summary.vitals.map(v => v.heart_rate || 0),
+                            data: [data.patient_summary.vitals.heart_rate],
                             borderColor: 'blue',
                             fill: false
                         }, {
-                            label: 'Blood Pressure',
-                            data: data.patient_summary.vitals.map(v => v.heart_rate || 0),
+                            label: 'Blood Pressure (Systolic)',
+                            data: [data.patient_summary.vitals.bp_systolic],
                             borderColor: 'red',
                             fill: false
                         }]
                     },
                     options: { responsive: true }
                 });
+
+                // Render textual EHR summary
+                ehrSummaryList.innerHTML = `
+                    <li><strong>Medical History:</strong> ${data.patient_summary.medical_history}</li>
+                    <li><strong>Medications:</strong> ${data.patient_summary.medications}</li>
+                    <li><strong>Recent Appointments:</strong> ${
+                        data.patient_summary.recent_appointments.length > 0
+                            ? data.patient_summary.recent_appointments.map(appt => `${appt.date} ${appt.time} with ${appt.doctor_name} (${appt.status})`).join(', ')
+                            : 'No recent appointments'
+                    }</li>
+                    <li><strong>Recent Notes:</strong> ${
+                        data.patient_summary.recent_notes.length > 0
+                            ? data.patient_summary.recent_notes.map(note => `${note.created_at}: ${note.subjective} (Assessment: ${note.assessment})`).join('; ')
+                            : 'No recent notes'
+                    }</li>
+                `;
             } else {
-                console.warn("Patient summary chart element or data not found. Ensure <canvas id='patient-summary-chart'> exists in ai_insights.html.");
+                console.warn("Patient summary chart or EHR summary list element not found.");
+                if (ehrSummaryList) {
+                    ehrSummaryList.innerHTML = '<li>No summary available</li>';
+                }
             }
+
+
+
 
             // Health Risk Prediction
             const riskList = document.getElementById('health-risk-prediction');
@@ -1481,7 +1837,6 @@ function loadAllAIInsights(patientId) {
             } else {
                 console.warn("Health risk prediction element not found. Ensure <ul id='health-risk-prediction'> exists in ai_insights.html.");
             }
-
             // Triaged Tasks
             const triageList = document.getElementById('triage-tasks');
             if (triageList) {
@@ -1493,7 +1848,6 @@ function loadAllAIInsights(patientId) {
             } else {
                 console.warn("Triage tasks element not found. Ensure <ul id='triage-tasks'> exists in ai_insights.html.");
             }
-
             // Image Analysis
             const imageList = document.getElementById('image-analysis');
             if (imageList) {
@@ -1505,7 +1859,6 @@ function loadAllAIInsights(patientId) {
             } else {
                 console.warn("Image analysis element not found. Ensure <ul id='image-analysis'> exists in ai_insights.html.");
             }
-
             // Unified Data
             const unifiedList = document.getElementById('unified-data');
             if (unifiedList) {
@@ -1517,7 +1870,6 @@ function loadAllAIInsights(patientId) {
             } else {
                 console.warn("Unified data element not found. Ensure <ul id='unified-data'> exists in ai_insights.html.");
             }
-
             // Wearable Monitoring
             const wearableList = document.getElementById('wearable-monitoring');
             if (wearableList) {
@@ -1529,7 +1881,6 @@ function loadAllAIInsights(patientId) {
             } else {
                 console.warn("Wearable monitoring element not found. Ensure <ul id='wearable-monitoring'> exists in ai_insights.html.");
             }
-
             // Compliance Check
             const complianceList = document.getElementById('compliance-check');
             if (complianceList) {
@@ -1541,7 +1892,6 @@ function loadAllAIInsights(patientId) {
             } else {
                 console.warn("Compliance check element not found. Ensure <ul id='compliance-check'> exists in ai_insights.html.");
             }
-
             // Personalized Plan
             const planList = document.getElementById('personalized-plan');
             if (planList) {
@@ -1566,7 +1916,6 @@ function loadAllAIInsights(patientId) {
             });
         });
 }
-
 
 // ********************** Handle real-time vitals alerts *********************************
 // Handle real-time vitals alerts
@@ -1598,6 +1947,135 @@ function setupVitalsAlerts() {
 
 // ***************** Transcription functionality ***********************
 // Transcription functionality
+// function setupTranscription() {
+//     const transcribeButton = document.getElementById('transcribe-button');
+//     if (!transcribeButton) {
+//         console.warn("Transcribe button not found.");
+//         return;
+//     }
+
+//     // Check if SpeechRecognition is supported
+//     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+//     if (!SpeechRecognition) {
+//         console.error("SpeechRecognition not supported in this browser.");
+//         showError('errorMessage', 'Speech recognition is not supported in this browser. Please use a modern browser like Chrome.');
+//         transcribeButton.disabled = true;
+//         return;
+//     }
+
+//     let isTranscribing = false;
+//     const recognition = new SpeechRecognition();
+//     recognition.lang = 'en-US';
+//     recognition.interimResults = true;
+//     recognition.continuous = true;
+
+//     transcribeButton.addEventListener('click', async () => {
+//         const patientSelect = document.getElementById('ai-patient-select');
+//         const patientId = patientSelect?.value;
+
+//         if (!patientId) {
+//             showError('errorMessage', 'Please select a patient to transcribe.');
+//             return;
+//         }
+
+//         try {
+//             // Request microphone permission
+//             await navigator.mediaDevices.getUserMedia({ audio: true });
+//             if (!isTranscribing) {
+//                 recognition.start();
+//                 transcribeButton.textContent = 'Stop Transcription';
+//                 isTranscribing = true;
+//                 showNotification('Transcription started. Speak clearly.', 'info');
+//             } else {
+//                 recognition.stop();
+//                 transcribeButton.textContent = 'Start Transcription';
+//                 isTranscribing = false;
+//             }
+//         } catch (error) {
+//             console.error("Error accessing microphone:", error.message);
+//             showError('errorMessage', 'Microphone access denied or unavailable. Please check permissions.');
+//         }
+//     });
+
+//     recognition.onresult = event => {
+//         const patientSelect = document.getElementById('ai-patient-select');
+//         const patientId = patientSelect?.value;
+
+//         if (!patientId) {
+//             console.error("Patient ID not selected during transcription.");
+//             showError('errorMessage', 'Patient selection lost. Please select a patient and try again.');
+//             recognition.stop();
+//             return;
+//         }
+
+//         const transcript = Array.from(event.results)
+//             .map(result => result[0].transcript)
+//             .join('');
+//         if (event.results[0].isFinal) {
+//             console.log('Sending transcription to /transcribe:', { patientId, transcript });
+//             fetch(`/transcribe/${patientId}`, {
+//                 method: 'POST',
+//                 headers: { 'Content-Type': 'application/json' },
+//                 body: JSON.stringify({ transcription: transcript }),
+//                 credentials: 'include'
+//             })
+//                 .then(response => {
+//                     if (!response.ok) {
+//                         return response.json().then(err => {
+//                             throw new Error(err.error || `Failed to save transcription: ${response.status}`);
+//                         });
+//                     }
+//                     return response.json();
+//                 })
+//                 .then(data => {
+//                     console.log("Transcription saved:", data);
+//                     showNotification('Transcription saved successfully.', 'info');
+//                     const notesList = document.getElementById('patient-notes');
+//                     if (notesList) {
+//                         fetch(`/api/patient_notes/${patientId}`, { credentials: 'include' })
+//                             .then(response => {
+//                                 if (!response.ok) throw new Error('Failed to fetch patient notes');
+//                                 return response.json();
+//                             })
+//                             .then(data => {
+//                                 notesList.innerHTML = data.length > 0
+//                                     ? data.map(note => `<li>${note.created_at || 'No date available'}: ${note.note}</li>`).join('')
+//                                     : '<li>No notes available</li>';
+//                             })
+//                             .catch(error => {
+//                                 console.error("Error fetching patient notes:", error.message);
+//                                 notesList.innerHTML = `<li>Error loading notes: ${error.message}</li>`;
+//                             });
+//                     }
+//                 })
+//                 .catch(error => {
+//                     console.error("Error saving transcription:", error.message);
+//                     showError('errorMessage', `Error saving transcription: ${error.message}`);
+//                 });
+//         }
+//     };
+
+//     recognition.onerror = event => {
+//         console.error("Transcription error:", event.error);
+//         if (event.error === 'no-speech') {
+//             showError('errorMessage', 'No speech detected. Please speak clearly or check your microphone.');
+//         } else if (event.error === 'audio-capture') {
+//             showError('errorMessage', 'Microphone not detected. Please ensure a microphone is connected.');
+//         } else if (event.error === 'not-allowed') {
+//             showError('errorMessage', 'Microphone access denied. Please allow microphone permissions in your browser.');
+//         } else {
+//             showError('errorMessage', `Transcription error: ${event.error}`);
+//         }
+//         transcribeButton.textContent = 'Start Transcription';
+//         isTranscribing = false;
+//     };
+
+//     recognition.onend = () => {
+//         transcribeButton.textContent = 'Start Transcription';
+//         isTranscribing = false;
+//     };
+// }
+
 function setupTranscription() {
     const transcribeButton = document.getElementById('transcribe-button');
     if (!transcribeButton) {
@@ -1605,7 +2083,6 @@ function setupTranscription() {
         return;
     }
 
-    // Check if SpeechRecognition is supported
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
         console.error("SpeechRecognition not supported in this browser.");
@@ -1630,7 +2107,6 @@ function setupTranscription() {
         }
 
         try {
-            // Request microphone permission
             await navigator.mediaDevices.getUserMedia({ audio: true });
             if (!isTranscribing) {
                 recognition.start();
@@ -1680,21 +2156,29 @@ function setupTranscription() {
                 })
                 .then(data => {
                     console.log("Transcription saved:", data);
-                    showNotification('Transcription saved successfully.', 'info');
+                    showNotification('Transcription saved as SOAP notes.', 'info');
                     const notesList = document.getElementById('patient-notes');
                     if (notesList) {
-                        fetch(`/api/patient_notes/${patientId}`, { credentials: 'include' })
+                        fetch(`/medical_notes/${patientId}`, { credentials: 'include' })
                             .then(response => {
-                                if (!response.ok) throw new Error('Failed to fetch patient notes');
+                                if (!response.ok) throw new Error('Failed to fetch medical notes');
                                 return response.json();
                             })
                             .then(data => {
                                 notesList.innerHTML = data.length > 0
-                                    ? data.map(note => `<li>${note.created_at || 'No date available'}: ${note.note}</li>`).join('')
+                                    ? data.map(note => `
+                                        <div class="p-2 bg-gray-100 rounded mb-2">
+                                            <p><strong>Created At:</strong> ${note.created_at || 'No date available'}</p>
+                                            <p><strong>Subjective:</strong> ${note.subjective}</p>
+                                            <p><strong>Objective:</strong> ${note.objective}</p>
+                                            <p><strong>Assessment:</strong> ${note.assessment}</p>
+                                            <p><strong>Plan:</strong> ${note.plan}</p>
+                                        </div>
+                                    `).join('')
                                     : '<li>No notes available</li>';
                             })
                             .catch(error => {
-                                console.error("Error fetching patient notes:", error.message);
+                                console.error("Error fetching medical notes:", error.message);
                                 notesList.innerHTML = `<li>Error loading notes: ${error.message}</li>`;
                             });
                     }
@@ -1726,6 +2210,7 @@ function setupTranscription() {
         isTranscribing = false;
     };
 }
+
 
 // Chatbot functionality
 function setupChatbot() {
@@ -1857,6 +2342,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Setup dropdown menus
     setupDropdownMenus();
 });
+
 
 
 // Function to load WhatsApp tab content
@@ -2167,8 +2653,6 @@ async function scheduleReminder() {
 
 
 
-
-
 async function scheduleAppointment() {
     const patientId = document.getElementById('whatsapp-patient-select')?.value;
     if (!patientId) {
@@ -2235,7 +2719,11 @@ function stopRecording() {
     }
 }
 
-// sendVoiceNote funciton
+
+
+
+
+// // sendVoiceNote funciton
 // async function sendVoiceNote() {
 //     const patientId = document.getElementById('medical-notes-patient-select')?.value;
 //     if (!patientId) {
@@ -2305,6 +2793,26 @@ async function sendVoiceNote(patientId) {
         document.querySelector('button[onclick="stopRecording()"]').disabled = true;
     }
 }
+
+
+function closeAddAppointmentModal() {
+    const modal = document.getElementById('addAppointmentModal');
+    if (modal) {
+        modal.classList.add('hidden');
+        // Reset form
+        const form = document.getElementById('appointment-form');
+        if (form) {
+            form.reset();
+        }
+    } else {
+        console.warn("Add Appointment modal not found");
+    }
+}
+
+
+
+
+
 
 
 //******************** Load Medical Notes ****************************

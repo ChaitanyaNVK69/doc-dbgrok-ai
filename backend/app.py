@@ -29,15 +29,20 @@ import requests
 import threading
 import psycopg2
 import time
+import speech_recognition as sr
 # Import the init_db function to create the database schema
 from init_db import init_db
 
 # Example using OpenAI API (requires `openai` package)
 from openai import OpenAI
 
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', 'your-openai-api-key-here')  # Replace with your actual key
-client = OpenAI(api_key=OPENAI_API_KEY)
+# OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', 'your-openai-api-key-here')  # Replace with your actual key
+# client = OpenAI(api_key=OPENAI_API_KEY)
 
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+if not OPENAI_API_KEY:
+    raise ValueError("OPENAI_API_KEY environment variable not set")
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 # Add at the top of app.py, after imports
 db_lock = threading.Lock()
@@ -663,26 +668,120 @@ def follow_up_reminder(patient_id):
         print(f"Error generating follow-up reminder for patient {patient_id}: {e}")
         return jsonify({'error': str(e)}), 500
 
+
+
+# @app.route('/patient_summary/<int:patient_id>')
+# def patient_summary(patient_id):
+#     try:
+#         conn = get_db_connection()
+#         patient = conn.execute('SELECT recent_vitals, medical_history FROM patients WHERE id = ?', (patient_id,)).fetchone()
+#         conn.close()
+
+#         if not patient:
+#             return jsonify({'error': 'Patient not found'}), 404
+
+#         vitals = patient['recent_vitals'].split(',') if patient['recent_vitals'] else []
+#         summary = {
+#             'vitals': [{'heart_rate': float(v.split('HR:')[1]) if 'HR:' in v else 0} for v in vitals],
+#             'labels': ['Latest'],
+#             'history': patient['medical_history']
+#         }
+#         return jsonify(summary)
+#     except Exception as e:
+#         print(f"Error generating patient summary: {e}")
+#         return jsonify({'error': str(e)}), 500
+
+
 @app.route('/patient_summary/<int:patient_id>')
 def patient_summary(patient_id):
     try:
         conn = get_db_connection()
-        patient = conn.execute('SELECT recent_vitals, medical_history FROM patients WHERE id = ?', (patient_id,)).fetchone()
+        patient = conn.execute('SELECT name, medical_history, recent_vitals, medications, allergies FROM patients WHERE id = ?', (patient_id,)).fetchone()
+        recent_appointments = conn.execute('SELECT date, time, reason, status FROM appointments WHERE patient_id = ? ORDER BY date DESC LIMIT 3', (patient_id,)).fetchall()
+        medical_notes = conn.execute('SELECT subjective, assessment, created_at FROM medical_notes WHERE patient_id = ? ORDER BY created_at DESC LIMIT 3', (patient_id,)).fetchall()
         conn.close()
 
         if not patient:
             return jsonify({'error': 'Patient not found'}), 404
 
+        # Extract vitals data for chart
         vitals = patient['recent_vitals'].split(',') if patient['recent_vitals'] else []
-        summary = {
-            'vitals': [{'heart_rate': float(v.split('HR:')[1]) if 'HR:' in v else 0} for v in vitals],
-            'labels': ['Latest'],
-            'history': patient['medical_history']
+        vitals_data = []
+        heart_rate = None
+        bp_systolic = None
+        for vital in vitals:
+            if 'HR:' in vital:
+                heart_rate = float(vital.split('HR:')[1]) if vital.split('HR:')[1] else 0
+            if 'BP:' in vital:
+                bp_systolic = float(vital.split('BP:')[1].split('/')[0]) if vital.split('BP:')[1] else 0
+        vitals_data.append({'heart_rate': heart_rate, 'bp_systolic': bp_systolic})
+
+        # Prepare summary data
+        summary_data = {
+            'name': patient['name'],
+            'medical_history': patient['medical_history'] or 'No medical history available',
+            'recent_vitals': patient['recent_vitals'] or 'No recent vitals available',
+            'medications': patient['medications'] or 'No medications recorded',
+            'allergies': patient['allergies'] or 'No allergies recorded',
+            'recent_appointments': [
+                {'date': appt['date'], 'time': appt['time'], 'reason': appt['reason'], 'status': appt['status']}
+                for appt in recent_appointments
+            ],
+            'recent_notes': [
+                {'created_at': note['created_at'], 'subjective': note['subjective'], 'assessment': note['assessment']}
+                for note in medical_notes
+            ],
+            'vitals': vitals_data,
+            'labels': ['Latest']
         }
-        return jsonify(summary)
+
+        # Generate a concise summary using simple keyword extraction
+        critical_keywords = ['emergency', 'urgent', 'high risk', 'cardiac', 'severe', 'diabetes']
+        summary_text = f"Patient: {patient['name']}\n"
+        summary_points = []
+
+        # Check medical history
+        if patient['medical_history']:
+            for keyword in critical_keywords:
+                if keyword.lower() in patient['medical_history'].lower():
+                    summary_points.append(f"Critical history: {keyword.capitalize()} noted in medical history.")
+                    break
+
+        # Check recent vitals
+        if heart_rate and heart_rate > 100:
+            summary_points.append("High heart rate detected: " + str(heart_rate) + " bpm.")
+        if bp_systolic and bp_systolic > 140:
+            summary_points.append("High blood pressure detected: " + str(bp_systolic) + " mmHg systolic.")
+
+        # Check recent appointments
+        if recent_appointments:
+            upcoming = [appt for appt in recent_appointments if appt['status'] == 'Upcoming']
+            if upcoming:
+                summary_points.append(f"Upcoming appointment: {upcoming[0]['date']} at {upcoming[0]['time']}.")
+
+        # Check recent medical notes
+        if medical_notes:
+            for note in medical_notes:
+                for keyword in critical_keywords:
+                    if keyword.lower() in note['subjective'].lower() or keyword.lower() in note['assessment'].lower():
+                        summary_points.append(f"Critical note on {note['created_at']}: {keyword.capitalize()} mentioned in subjective or assessment.")
+                        break
+
+        # Compile summary
+        if summary_points:
+            summary_text += "\nKey Points:\n- " + "\n- ".join(summary_points)
+        else:
+            summary_text += "\nNo critical issues identified at this time."
+
+        summary_data['summary_text'] = summary_text
+
+        return jsonify(summary_data)
     except Exception as e:
         print(f"Error generating patient summary: {e}")
         return jsonify({'error': str(e)}), 500
+
+
+
 
 @app.route('/health_risk_prediction/<int:patient_id>')
 def health_risk_prediction(patient_id):
@@ -804,30 +903,66 @@ def personalized_plan(patient_id):
         print(f"Error generating personalized plan: {e}")
         return jsonify({'error': str(e)}), 500
 
+# @app.route('/transcribe/<int:patient_id>', methods=['POST'])
+# def transcribe(patient_id):
+#     try:
+#         data = request.get_json()
+#         transcription = data.get('transcription', '')
+
+#         if not transcription:
+#             return jsonify({'error': 'No transcription provided'}), 400
+
+#         with db_lock:
+#             conn = get_db_connection()
+#             conn.execute('INSERT INTO patient_notes (patient_id, note, created_at) VALUES (?, ?, ?)',
+#                          (patient_id, transcription, datetime.now().strftime('%Y-%m-%d')))
+#             conn.commit()
+#             conn.close()
+
+#         print(f"Transcription saved for patient {patient_id}: {transcription}")
+#         return jsonify({'status': 'Transcription saved'})
+#     except sqlite3.OperationalError as e:
+#         print(f"Database error in /transcribe for patient {patient_id}: {e}")
+#         return jsonify({'error': f"Database error: {str(e)}"}), 500
+#     except Exception as e:
+#         print(f"Unexpected error in /transcribe for patient {patient_id}: {e}")
+#         return jsonify({'error': str(e)}), 500
+
+
 @app.route('/transcribe/<int:patient_id>', methods=['POST'])
 def transcribe(patient_id):
     try:
         data = request.get_json()
         transcription = data.get('transcription', '')
-
         if not transcription:
             return jsonify({'error': 'No transcription provided'}), 400
 
         with db_lock:
             conn = get_db_connection()
-            conn.execute('INSERT INTO patient_notes (patient_id, note, created_at) VALUES (?, ?, ?)',
-                         (patient_id, transcription, datetime.now().strftime('%Y-%m-%d')))
+            patient = conn.execute('SELECT name FROM patients WHERE id = ?', (patient_id,)).fetchone()
+            if not patient:
+                conn.close()
+                return jsonify({'error': 'Patient not found'}), 404
+
+            # Generate SOAP notes from the transcription
+            notes = generate_soap_notes(transcription)
+
+            # Save structured SOAP notes
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            conn.execute('INSERT INTO medical_notes (patient_id, subjective, objective, assessment, plan, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+                        (patient_id, notes['subjective'], notes['objective'], notes['assessment'], notes['plan'], timestamp))
             conn.commit()
             conn.close()
 
-        print(f"Transcription saved for patient {patient_id}: {transcription}")
-        return jsonify({'status': 'Transcription saved'})
+        print(f"Transcription saved as SOAP notes for patient {patient_id}: {transcription}")
+        return jsonify({'status': 'Transcription saved as SOAP notes', 'notes': notes})
     except sqlite3.OperationalError as e:
         print(f"Database error in /transcribe for patient {patient_id}: {e}")
         return jsonify({'error': f"Database error: {str(e)}"}), 500
     except Exception as e:
         print(f"Unexpected error in /transcribe for patient {patient_id}: {e}")
         return jsonify({'error': str(e)}), 500
+        
 
 @app.route('/chatbot/<int:patient_id>', methods=['POST'])
 def chatbot(patient_id):
@@ -1128,6 +1263,10 @@ def dashboard():
 
         patients = conn.execute(query, params).fetchall()
 
+        # Fetch patients and doctors for the Add Appointment modal
+        all_patients = conn.execute('SELECT id, name FROM patients').fetchall()
+        doctors = conn.execute('SELECT id, name FROM doctors').fetchall()
+
         appointments = conn.execute('SELECT * FROM appointments').fetchall()
 
         tasks = conn.execute('SELECT * FROM tasks').fetchall()
@@ -1161,6 +1300,8 @@ def dashboard():
         return render_template('dashboard.html',
                             overview=overview,
                             patients=patients,
+                            all_patients=all_patients,  # For modal dropdown
+                            doctors=doctors,  # For modal dropdown
                             appointments=appointments,
                             tasks=tasks,
                             notifications=notifications,
@@ -2600,6 +2741,23 @@ def send_daily_reminders():
     except Exception as e:
         print(f"Error sending daily reminders: {e}")
 
+def log_email(recipient_email, subject, body, status, error_message=None):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        cursor.execute('INSERT INTO email_logs (recipient_email, subject, body, sent_at, status, error_message) VALUES (?, ?, ?, ?, ?, ?)',
+                      (recipient_email, subject, body, timestamp, status, error_message))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        print(f"Email logged: {recipient_email}, Status: {status}")
+    except Exception as e:
+        print(f"Error logging email: {e}")
+
+
+
+
 def generate_soap_notes(text):
     # Simple NLP to extract SOAP components (Subjective, Objective, Assessment, Plan)
     subjective = "Patient reports: " + text
@@ -2725,14 +2883,44 @@ def billing():
         conn.execute('INSERT INTO billing (patient_id, visit_cost, amount_due, status, alert, created_at) VALUES (?, ?, ?, ?, ?, ?)',
                     (patient_id, visit_cost, billing_result['amount_due'], billing_result['status'], billing_result['alert'], timestamp))
         conn.commit()
-        conn.close()
+        
+
+        # # Send WhatsApp notification
+        # message = f"Billing processed for your visit. Amount due: ${billing_result['amount_due']:.2f}."
+        # if billing_result['alert']:
+        #     message += f" Alert: {billing_result['alert']}"
+        # send_whatsapp_message(patient['whatsapp_number'], message)
 
         # Send WhatsApp notification
-        message = f"Billing processed for your visit. Amount due: ${billing_result['amount_due']:.2f}."
+        whatsapp_message = f"Billing processed for your visit. Amount due: ${billing_result['amount_due']:.2f}."
         if billing_result['alert']:
-            message += f" Alert: {billing_result['alert']}"
-        send_whatsapp_message(patient['whatsapp_number'], message)
+            whatsapp_message += f" Alert: {billing_result['alert']}"
+        try:
+            send_whatsapp_message(patient['whatsapp_number'], whatsapp_message)
+        except Exception as e:
+            print(f"Failed to send WhatsApp message: {e}")
 
+        # Send email notification to patient
+        if patient['contact_info']:
+            email_subject = "Billing Statement"
+            email_body = f"Dear {patient['name']},\n\nBilling processed for your visit.\nAmount due: ${billing_result['amount_due']:.2f}.\n"
+            if billing_result['alert']:
+                email_body += f"Alert: {billing_result['alert']}\n"
+            email_body += "\nPlease settle the amount at your earliest convenience.\n\nBest regards,\nDoctor Dashboard"
+            try:
+                msg = Message(email_subject, sender=app.config['MAIL_USERNAME'], recipients=[patient['contact_info']])
+                msg.body = email_body
+                mail.send(msg)
+                print(f"Email sent to {patient['contact_info']}")
+                log_email(patient['contact_info'], email_subject, email_body, 'sent')
+            except Exception as e:
+                print(f"Email send failed: {e}")
+                log_email(patient['contact_info'], email_subject, email_body, 'failed', str(e))
+        else:
+            print(f"No email address found for patient {patient_id}")    
+
+
+        conn.close()
         return jsonify({'status': 'Billing processed', 'result': billing_result})
     except Exception as e:
         print(f"Error processing billing: {e}")

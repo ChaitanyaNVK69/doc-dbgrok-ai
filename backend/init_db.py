@@ -210,6 +210,19 @@ def init_db():
             FOREIGN KEY (user_id) REFERENCES users (id),
             FOREIGN KEY (patient_id) REFERENCES patients (id)
         )
+    ''')
+    
+    # Create email_logs table to store email sending history
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS email_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            recipient_email TEXT NOT NULL,
+            subject TEXT NOT NULL,
+            body TEXT NOT NULL,
+            sent_at TEXT NOT NULL,
+            status TEXT NOT NULL, -- 'sent', 'failed'
+            error_message TEXT
+        )
     ''')   
     
     # Tasks table

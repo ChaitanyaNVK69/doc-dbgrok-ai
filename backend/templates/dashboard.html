@@ -414,55 +414,66 @@
             </div>
         </div>
 
-        <!-- Add Appointment Modal -->
-        <div class="modal fixed inset-0 flex items-center justify-center hidden" id="addAppointmentModal" tabindex="-1" role="dialog" aria-labelledby="addAppointmentModalLabel">
-            <div class="modal-content max-w-md w-full p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h5 class="text-lg font-bold" id="addAppointmentModalLabel">Add Appointment</h5>
-                    <button type="button" class="text-gray-600 hover:text-gray-800" data-bs-dismiss="modal" aria-label="Close">×</button>
-                </div>
-                <form method="POST" action="{{ url_for('add_appointment') }}">
-                    <div class="mb-4">
-                        <label for="appt-patient-id" class="block text-sm font-medium text-gray-700">Patient</label>
-                        <select class="w-full p-2 border rounded-md" id="appt-patient-id" name="patient_id" required title="Select patient" aria-describedby="appt-patient-id-help">
-                            {% for patient in patients %}
-                            <option value="{{ patient.id }}">{{ patient.name }}</option>
-                            {% endfor %}
-                        </select>
-                        <small id="appt-patient-id-help" class="text-gray-500">Select a patient</small>
-                    </div>
-                    <div class="mb-4">
-                        <label for="appt-title" class="block text-sm font-medium text-gray-700">Title</label>
-                        <input type="text" class="w-full p-2 border rounded-md" id="appt-title" name="title" required placeholder="Enter appointment title" title="Appointment title" aria-describedby="appt-title-help">
-                        <small id="appt-title-help" class="text-gray-500">Appointment title</small>
-                    </div>
-                    <div class="mb-4">
-                        <label for="addAppointmentDate" class="block text-sm font-medium text-gray-700">Date</label>
-                        <input type="date" class="w-full p-2 border rounded-md" id="addAppointmentDate" name="date" required title="Appointment date" aria-describedby="appt-date-help">
-                        <small id="appt-date-help" class="text-gray-500">Appointment date</small>
-                    </div>
-                    <div class="mb-4">
-                        <label for="appt-time" class="block text-sm font-medium text-gray-700">Time</label>
-                        <input type="time" class="w-full p-2 border rounded-md" id="appt-time" name="time" required placeholder="Enter time" title="Appointment time" aria-describedby="appt-time-help">
-                        <small id="appt-time-help" class="text-gray-500">Appointment time</small>
-                    </div>
-                    <div class="mb-4">
-                        <label for="appt-notes" class="block text-sm font-medium text-gray-700">Notes</label>
-                        <textarea class="w-full p-2 border rounded-md" id="appt-notes" name="notes" placeholder="Enter notes" title="Appointment notes" aria-describedby="appt-notes-help"></textarea>
-                        <small id="appt-notes-help" class="text-gray-500">Additional notes</small>
-                    </div>
-                    <div class="mb-4">
-                        <label for="appt-status" class="block text-sm font-medium text-gray-700">Status</label>
-                        <select class="w-full p-2 border rounded-md" id="appt-status" name="status" required title="Appointment status" aria-describedby="appt-status-help">
-                            <option value="Upcoming">Upcoming</option>
-                            <option value="Completed">Completed</option>
-                        </select>
-                        <small id="appt-status-help" class="text-gray-500">Appointment status</small>
-                    </div>
-                    <button type="submit" class="btn-primary" title="Add appointment" aria-label="Add appointment">Add Appointment</button>
-                </form>
+       <!-- Add Appointment Modal -->
+       <div class="modal fixed inset-0 flex items-center justify-center hidden" id="addAppointmentModal" tabindex="-1" role="dialog" aria-labelledby="addAppointmentModalLabel">
+        <div class="modal-content max-w-md w-full p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h5 class="text-lg font-bold" id="addAppointmentModalLabel">Add Appointment</h5>
+                <button type="button" class="text-gray-600 hover:text-gray-800" data-bs-dismiss="modal" aria-label="Close">×</button>
             </div>
+            <form method="POST" action="{{ url_for('add_appointment') }}">
+                <div class="mb-4">
+                    <label for="appt-patient-id" class="block text-sm font-medium text-gray-700">Patient</label>
+                    <select class="w-full p-2 border rounded-md" id="appt-patient-id" name="patient_id" required title="Select patient" aria-describedby="appt-patient-id-help">
+                        <option value="">Select a patient</option>
+                        {% for patient in patients %}
+                        <option value="{{ patient.id }}">{{ patient.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <small id="appt-patient-id-help" class="text-gray-500">Select a patient</small>
+                </div>
+                <div class="mb-4">
+                    <label for="doctor_id" class="block text-sm font-medium text-gray-700">Doctor</label>
+                    <select class="w-full p-2 border rounded-md" id="doctor_id" name="doctor_id">
+                        <option value="">Select a doctor</option>
+                        {% for doctor in doctors %}
+                            <option value="{{ doctor.id }}">{{ doctor.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <small id="doctor-id-help" class="text-gray-500">Select a doctor for the appointment</small>
+                </div>
+                <div class="mb-4">
+                    <label for="appt-title" class="block text-sm font-medium text-gray-700">Title</label>
+                    <input type="text" class="w-full p-2 border rounded-md" id="appt-title" name="title" required placeholder="Enter appointment title" title="Appointment title" aria-describedby="appt-title-help">
+                    <small id="appt-title-help" class="text-gray-500">Appointment title</small>
+                </div>
+                <div class="mb-4">
+                    <label for="addAppointmentDate" class="block text-sm font-medium text-gray-700">Date</label>
+                    <input type="date" class="w-full p-2 border rounded-md" id="addAppointmentDate" name="date" required title="Appointment date" aria-describedby="appt-date-help">
+                    <small id="appt-date-help" class="text-gray-500">Appointment date</small>
+                </div>
+                <div class="mb-4">
+                    <label for="appt-time" class="block text-sm font-medium text-gray-700">Time</label>
+                    <input type="time" class="w-full p-2 border rounded-md" id="appt-time" name="time" required placeholder="Enter time" title="Appointment time" aria-describedby="appt-time-help">
+                    <small id="appt-time-help" class="text-gray-500">Appointment time</small>
+                </div>
+                <div class="mb-4">
+                    <label for="appt-notes" class="block text-sm font-medium text-gray-700">Reason/Symptoms:</label>
+                    <textarea class="w-full p-2 border rounded-md" id="appt-notes" name="notes" placeholder="Enter reasons" title="Appointment notes" aria-describedby="appt-notes-help"></textarea>
+                    <small id="appt-notes-help" class="text-gray-500">Describe the reason or symptoms for the appointment</small>
+                </div>
+                <div class="mb-4">
+                    <label for="appt-status" class="block text-sm font-medium text-gray-700">Status</label>
+                    <select class="w-full p-2 border rounded-md" id="appt-status" name="status" required title="Appointment status" aria-describedby="appt-status-help">
+                        <option value="Upcoming">Upcoming</option>
+                        <option value="Completed">Completed</option>
+                    </select>
+                    <small id="appt-status-help" class="text-gray-500">Appointment status</small>
+                </div>
+                <button type="submit" class="btn-primary" title="Add appointment" aria-label="Add appointment">Add Appointment</button>
+            </form>
         </div>
+    </div>
 
         <!-- Add Task Modal -->
         <div class="modal fixed inset-0 flex items-center justify-center hidden" id="addTaskModal" tabindex="-1" role="dialog" aria-labelledby="addTaskModalLabel">
