@@ -36,8 +36,7 @@ from init_db import init_db
 # Example using OpenAI API (requires `openai` package)
 from openai import OpenAI
 
-# OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', 'your-openai-api-key-here')  # Replace with your actual key
-# client = OpenAI(api_key=OPENAI_API_KEY)
+
 
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 if not OPENAI_API_KEY:
