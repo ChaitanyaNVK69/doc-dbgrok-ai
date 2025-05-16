@@ -19,3 +19,4 @@ __pycache__/
 .vscode/backend/.env
 
 .envbackend/.env
+backend/.env
