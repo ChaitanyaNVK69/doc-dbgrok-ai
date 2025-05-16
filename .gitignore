@@ -21,3 +21,4 @@ __pycache__/
 .env
 
 backend/.env
+backend/.env
