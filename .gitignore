@@ -18,5 +18,6 @@ __pycache__/
 .idea/
 .vscode/backend/.env
 
-.envbackend/.env
+.env
+
 backend/.env
