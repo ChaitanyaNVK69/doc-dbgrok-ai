@@ -36,12 +36,13 @@ from init_db import init_db
 # Example using OpenAI API (requires `openai` package)
 from openai import OpenAI
 
-
+# Load environment variables
+load_dotenv()
 
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 if not OPENAI_API_KEY:
     raise ValueError("OPENAI_API_KEY environment variable not set")
-client = OpenAI(api_key=OPENAI_API_KEY)
+    client = OpenAI(api_key=OPENAI_API_KEY)
 
 # Add at the top of app.py, after imports
 db_lock = threading.Lock()
@@ -58,8 +59,7 @@ socketio = SocketIO(app)
 REGISTERED_NUMBERS_CACHE = None
 CACHE_DURATION = 3600  # Cache for 1 hour (in seconds)
 
-# Load environment variables
-load_dotenv()
+
 
 
 # WhatsApp API Configuration (replace with your Twilio credentials)

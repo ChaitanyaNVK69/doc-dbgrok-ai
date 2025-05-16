@@ -1,1 +1,21 @@
+# .gitignore
+# Virtual environments
+venv/
+env/
+
+# SQLite database (should be recreated on the server)
+doctor_dashboard.db
+
+# Temporary files
+*.pyc
+__pycache__/
+*.log
+
+# macOS-specific files
+.DS_Store
+
+# IDE files
+.idea/
+.vscode/backend/.env
+
 .env

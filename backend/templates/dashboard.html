@@ -158,6 +158,24 @@
             max-height: 250px; /* Smaller height on mobile */
             }
         }
+        .appointment-list::-webkit-scrollbar {
+        width: 8px;
+        }
+        .appointment-list::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        .appointment-list::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        .appointment-list::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        .appointment-list li:hover {
+            background-color: #f5f5f5;
+            transition: background-color 0.2s ease;
+        }
     </style>
 </head>
 <body>
@@ -330,7 +348,7 @@
                         <a href="{{ url_for('edit_appointment', id=appt.id) }}" class="btn-primary text-sm" title="Edit appointment {{ appt.title }}" aria-label="Edit appointment {{ appt.title }}">Edit</a>
                     </li>
                     {% endfor %}
-                </ul>
+                  </ul>
             </div>
         </div>
 
