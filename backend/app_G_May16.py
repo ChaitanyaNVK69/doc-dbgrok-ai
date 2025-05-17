@@ -11,7 +11,7 @@ np._mac_os_check = _dummy_check
 from flask import Flask, render_template, send_file, request, redirect, url_for, flash, session, jsonify
 from flask_mail import Mail, Message
 from flask_socketio import SocketIO, emit
-# import sqlite3
+import sqlite3
 from datetime import datetime, timedelta
 import pandas as pd
 from sklearn.cluster import KMeans
@@ -112,12 +112,32 @@ mail = Mail(app)
 #     return conn
 
 def get_db_connection():
-    conn_string = os.environ.get('DATABASE_URL')
-    if not conn_string:
-        raise ValueError("DATABASE_URL environment variable not set")
-    # Use sslmode='require' on Render, 'prefer' locally
-    sslmode = 'require' if os.environ.get('RENDER') == 'true' else 'prefer'
-    conn = psycopg2.connect(conn_string, sslmode=sslmode)
+    # Debug: Print environment variables
+    print("Environment variables:", {k: v for k, v in os.environ.items() if k.startswith('DB_') or k == 'RENDER'})
+    render_env = os.environ.get('RENDER', 'false').lower()
+    print(f"RENDER environment variable: {render_env}")
+    is_render = render_env == 'true'
+    print(f"Is running on Render? {is_render}")
+
+    if is_render:
+        print("Connecting to PostgreSQL on Render")
+        try:
+            # Only use PostgreSQL if explicitly on Render
+            conn = psycopg2.connect(
+                dbname=os.environ.get('DB_NAME'),
+                user=os.environ.get('DB_USER'),
+                password=os.environ.get('DB_PASSWORD'),
+                host=os.environ.get('DB_HOST'),
+                port=os.environ.get('DB_PORT'),
+                sslmode='require'
+            )
+        except psycopg2.Error as e:
+            print(f"Failed to connect to PostgreSQL: {e}")
+            raise
+    else:
+        print("Forcing local SQLite database connection")
+        conn = sqlite3.connect('doctor_dashboard.db')
+        conn.row_factory = sqlite3.Row
     return conn
 
 # Initialize database tables
@@ -2544,59 +2564,33 @@ def get_registered_numbers():
 
 
 # Add WhatsApp-related tables and columns
-# def init_whatsapp_tables():
-#     conn = get_db_connection()
-#     cursor = conn.cursor()
-
-#     # Check if whatsapp_number column already exists in patients table
-#     cursor = conn.execute("PRAGMA table_info(patients)")
-#     columns = [row[1] for row in cursor.fetchall()]  # Get list of column names
-#     if 'whatsapp_number' not in columns:
-#         try:
-#             conn.execute('''
-#                 ALTER TABLE patients ADD COLUMN whatsapp_number TEXT
-#             ''')
-#         except psycopg2.OperationalError as e:
-#             print(f"Error adding whatsapp_number column: {e}")
-
-#     # Add message_type column to chatbot_conversations if missing (for SQLite)
-#     if 'RENDER' not in os.environ:
-#         cursor = conn.execute("PRAGMA table_info(chatbot_conversations)")
-#         columns = [row[1] for row in cursor.fetchall()]
-#         if 'message_type' not in columns:
-#             try:
-#                 conn.execute('ALTER TABLE chatbot_conversations ADD COLUMN message_type TEXT')
-#                 conn.execute("UPDATE chatbot_conversations SET message_type = 'text' WHERE message_type IS NULL")
-#             except psycopg2.OperationalError as e:
-#                 print(f"Error adding message_type column to chatbot_conversations: {e}")
-
-#     conn.commit()
-#     conn.close()
 def init_whatsapp_tables():
     conn = get_db_connection()
-    cursor = conn.cursor()
 
-    # Check if whatsapp_number column exists
-    cursor.execute("""
-        SELECT column_name FROM information_schema.columns
-        WHERE table_name = 'patients' AND column_name = 'whatsapp_number'
-    """)
-    if not cursor.fetchone():
-        cursor.execute('ALTER TABLE patients ADD COLUMN whatsapp_number TEXT')
+    # Check if whatsapp_number column already exists in patients table
+    cursor = conn.execute("PRAGMA table_info(patients)")
+    columns = [row[1] for row in cursor.fetchall()]  # Get list of column names
+    if 'whatsapp_number' not in columns:
+        try:
+            conn.execute('''
+                ALTER TABLE patients ADD COLUMN whatsapp_number TEXT
+            ''')
+        except psycopg2.OperationalError as e:
+            print(f"Error adding whatsapp_number column: {e}")
 
-    # Check if message_type column exists in chatbot_conversations
-    cursor.execute("""
-        SELECT column_name FROM information_schema.columns
-        WHERE table_name = 'chatbot_conversations' AND column_name = 'message_type'
-    """)
-    if not cursor.fetchone():
-        cursor.execute('ALTER TABLE chatbot_conversations ADD COLUMN message_type TEXT')
-        cursor.execute("UPDATE chatbot_conversations SET message_type = 'text' WHERE message_type IS NULL")
+    # Add message_type column to chatbot_conversations if missing (for SQLite)
+    if 'RENDER' not in os.environ:
+        cursor = conn.execute("PRAGMA table_info(chatbot_conversations)")
+        columns = [row[1] for row in cursor.fetchall()]
+        if 'message_type' not in columns:
+            try:
+                conn.execute('ALTER TABLE chatbot_conversations ADD COLUMN message_type TEXT')
+                conn.execute("UPDATE chatbot_conversations SET message_type = 'text' WHERE message_type IS NULL")
+            except psycopg2.OperationalError as e:
+                print(f"Error adding message_type column to chatbot_conversations: {e}")
 
     conn.commit()
-    cursor.close()
     conn.close()
-
 
 
 # Call initialization functions on startup
@@ -3063,94 +3057,57 @@ def debug_routes():
 
 
 
-# @app.route('/tasks')
-# def tasks():
-#     if 'user_id' not in session:
-#         return redirect(url_for('login'))
-
-#     try:
-#         status = request.args.get('status', None)  # e.g., 'pending'
-#         conn = get_db_connection()
-#         cursor = conn.cursor()
-
-#         # Use a single query with conditional parameter passing
-#         # SQLite uses ? placeholders, PostgreSQL uses %s
-#         if 'RENDER' in os.environ and os.environ.get('RENDER') == 'true':
-#             if status:
-#                 query = 'SELECT id, patient_id, description, status, due_date FROM tasks WHERE status = %s ORDER BY due_date ASC'
-#                 cursor.execute(query, (status,))
-#             else:
-#                 query = 'SELECT id, patient_id, description, status, due_date FROM tasks ORDER BY due_date ASC'
-#                 cursor.execute(query)
-#         else:
-#             if status:
-#                 query = 'SELECT id, patient_id, description, status, due_date FROM tasks WHERE status = ? ORDER BY due_date ASC'
-#                 cursor.execute(query, (status,))
-#             else:
-#                 query = 'SELECT id, patient_id, description, status, due_date FROM tasks ORDER BY due_date ASC'
-#                 cursor.execute(query)
-
-#         tasks = cursor.fetchall()
-
-#         # Convert to list of dictionaries for template rendering
-#         task_list = [
-#             {
-#                 'id': task['id'],
-#                 'patient_id': task['patient_id'],
-#                 'description': task['description'],
-#                 'status': task['status'],
-#                 'due_date': task['due_date']
-#             } for task in tasks
-#         ]
-
-#         cursor.close()
-#         conn.close()
-#         return render_template('tasks.html', tasks=task_list)
-#     except (psycopg2.Error, sqlite3.Error) as e:
-#         print(f"Database error in /tasks: {e}")
-#         return jsonify({'error': str(e)}), 500
-#     except Exception as e:
-#         print(f"Unexpected error in /tasks: {e}")
-#         return jsonify({'error': str(e)}), 500
-
 @app.route('/tasks')
 def tasks():
     if 'user_id' not in session:
         return redirect(url_for('login'))
 
     try:
-        status = request.args.get('status', None)
+        status = request.args.get('status', None)  # e.g., 'pending'
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        if status:
-            query = 'SELECT id, patient_id, description, status, due_date FROM tasks WHERE status = %s ORDER BY due_date ASC'
-            cursor.execute(query, (status,))
+        # Use a single query with conditional parameter passing
+        # SQLite uses ? placeholders, PostgreSQL uses %s
+        if 'RENDER' in os.environ and os.environ.get('RENDER') == 'true':
+            if status:
+                query = 'SELECT id, patient_id, description, status, due_date FROM tasks WHERE status = %s ORDER BY due_date ASC'
+                cursor.execute(query, (status,))
+            else:
+                query = 'SELECT id, patient_id, description, status, due_date FROM tasks ORDER BY due_date ASC'
+                cursor.execute(query)
         else:
-            query = 'SELECT id, patient_id, description, status, due_date FROM tasks ORDER BY due_date ASC'
-            cursor.execute(query)
+            if status:
+                query = 'SELECT id, patient_id, description, status, due_date FROM tasks WHERE status = ? ORDER BY due_date ASC'
+                cursor.execute(query, (status,))
+            else:
+                query = 'SELECT id, patient_id, description, status, due_date FROM tasks ORDER BY due_date ASC'
+                cursor.execute(query)
 
         tasks = cursor.fetchall()
 
+        # Convert to list of dictionaries for template rendering
         task_list = [
             {
-                'id': task[0],
-                'patient_id': task[1],
-                'description': task[2],
-                'status': task[3],
-                'due_date': task[4]
+                'id': task['id'],
+                'patient_id': task['patient_id'],
+                'description': task['description'],
+                'status': task['status'],
+                'due_date': task['due_date']
             } for task in tasks
         ]
 
         cursor.close()
         conn.close()
         return render_template('tasks.html', tasks=task_list)
-    except psycopg2.Error as e:
+    except (psycopg2.Error, sqlite3.Error) as e:
         print(f"Database error in /tasks: {e}")
         return jsonify({'error': str(e)}), 500
     except Exception as e:
         print(f"Unexpected error in /tasks: {e}")
         return jsonify({'error': str(e)}), 500
+
+
 
 @app.route('/patients')
 def patients():
