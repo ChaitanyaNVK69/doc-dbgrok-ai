@@ -1,0 +1,253 @@
+{
+  "name": "Doctor Appointment Booking",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "twilioApi",
+        "event": "incomingMessage",
+        "phoneNumber": "whatsapp:+13343732835"
+      },
+      "name": "Twilio Trigger",
+      "type": "n8n-nodes-base.twilioTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "condition": [
+          {
+            "value1": "{{$node['Twilio Trigger'].json['Body'].includes(':')}}",
+            "operation": "equal",
+            "value2": true
+          }
+        ]
+      },
+      "name": "IF Confirmation",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "{{YOUR_CONFIRMATION_WEBHOOK_URL}}",
+        "sendBody": true,
+        "body": "{{$node['Twilio Trigger'].json}}"
+      },
+      "name": "Forward to Confirmation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [650, 200]
+    },
+    {
+      "parameters": {
+        "authentication": "openAIApi",
+        "operation": "chat",
+        "model": "gpt-4",
+        "prompt": "Extract the requested date, time, and patient name from this message: \"{{$node['Twilio Trigger'].json['Body']}}\". If vague, infer reasonable details based on today’s date ({{DateTime.now().toISODate()}}). Output JSON with `name`, `date`, `time`. Example: {\"name\": \"John Doe\", \"date\": \"2025-05-27\", \"time\": \"14:00\"}."
+      },
+      "name": "Parse Request",
+      "type": "n8n-nodes-base.openAI",
+      "typeVersion": 1,
+      "position": [650, 400]
+    },
+    {
+      "parameters": {
+        "authentication": "googleCalendarOAuth2",
+        "operation": "getAll",
+        "calendar": "hr.bglr@gmail.com",
+        "timeMin": "{{DateTime.fromISO($node['Parse Request'].json['date'] + 'T' + $node['Parse Request'].json['time']).minus({hours: 2}).toISO()}}",
+        "timeMax": "{{DateTime.fromISO($node['Parse Request'].json['date'] + 'T' + $node['Parse Request'].json['time']).plus({hours: 2}).toISO()}}"
+      },
+      "name": "Check Availability",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1,
+      "position": [850, 400]
+    },
+    {
+      "parameters": {
+        "condition": [
+          {
+            "value1": "{{$node['Check Availability'].json.length}}",
+            "operation": "equal",
+            "value2": 0
+          }
+        ]
+      },
+      "name": "IF Slot Free",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1050, 400]
+    },
+    {
+      "parameters": {
+        "authentication": "googleCalendarOAuth2",
+        "operation": "create",
+        "calendar": "hr.bglr@gmail.com",
+        "startDateTime": "{{$node['Parse Request'].json['date'] + 'T' + $node['Parse Request'].json['time']}}",
+        "endDateTime": "{{DateTime.fromISO($node['Parse Request'].json['date'] + 'T' + $node['Parse Request'].json['time']).plus({minutes: 30}).toISO()}}",
+        "summary": "Appointment with {{$node['Parse Request'].json['name']}}",
+        "description": "{{$node['Twilio Trigger'].json['From']}}"
+      },
+      "name": "Book Appointment",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "googleCalendarOAuth2",
+        "operation": "getAll",
+        "calendar": "hr.bglr@gmail.com",
+        "timeMin": "{{$node['Parse Request'].json['date']}}T09:00:00",
+        "timeMax": "{{$node['Parse Request'].json['date']}}T17:00:00",
+        "singleEvents": true,
+        "orderBy": "startTime"
+      },
+      "name": "Find Slots",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1,
+      "position": [1250, 500]
+    },
+    {
+      "parameters": {
+        "authentication": "twilioApi",
+        "operation": "send",
+        "to": "{{$node['Twilio Trigger'].json['From']}}",
+        "message": "Hi {{$node['Parse Request'].json['name'] || 'there'}}, {{$node['Parse Request'].json['time']}} on {{$node['Parse Request'].json['date']}} is unavailable. Available slots: {{$node['Find Slots'].json.map(slot => slot.start.time).join(', ')}}. Reply with your choice (e.g., \"15:00\")."
+      },
+      "name": "Send Slot Options",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [1450, 500]
+    },
+    {
+      "parameters": {
+        "triggerInterval": "day",
+        "time": "09:00",
+        "timezone": "Asia/Kolkata"
+      },
+      "name": "Schedule Reminder",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 700]
+    },
+    {
+      "parameters": {
+        "authentication": "googleCalendarOAuth2",
+        "operation": "getAll",
+        "calendar": "hr.bglr@gmail.com",
+        "timeMin": "{{DateTime.now().plus({days: 1}).startOf('day').toISO()}}",
+        "timeMax": "{{DateTime.now().plus({days: 1}).endOf('day').toISO()}}"
+      },
+      "name": "Get Upcoming Appointments",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1,
+      "position": [450, 700]
+    },
+    {
+      "parameters": {
+        "authentication": "twilioApi",
+        "operation": "send",
+        "to": "{{$node['Get Upcoming Appointments'].json['description']}}",
+        "message": "Hi Patient, your appointment is tomorrow at {{$node['Get Upcoming Appointments'].json['start'].dateTime}}. Reply ‘C’ to cancel or ‘R’ to reschedule."
+      },
+      "name": "Send Reminder",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [650, 700]
+    },
+    {
+      "parameters": {
+        "triggerInterval": "day",
+        "time": "18:00",
+        "timezone": "Asia/Kolkata"
+      },
+      "name": "Schedule Follow-Up",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 900]
+    },
+    {
+      "parameters": {
+        "authentication": "googleCalendarOAuth2",
+        "operation": "getAll",
+        "calendar": "hr.bglr@gmail.com",
+        "timeMin": "{{DateTime.now().minus({hours: 2}).toISO()}}",
+        "timeMax": "{{DateTime.now().toISO()}}"
+      },
+      "name": "Get Recent Appointments",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1,
+      "position": [450, 900]
+    },
+    {
+      "parameters": {
+        "authentication": "openAIApi",
+        "operation": "chat",
+        "model": "gpt-4",
+        "prompt": "Generate a personalized follow-up message for {{$node['Get Recent Appointments'].json['summary']}}. Include a survey link: https://example.com/survey. Output: message text."
+      },
+      "name": "Generate Follow-Up",
+      "type": "n8n-nodes-base.openAI",
+      "typeVersion": 1,
+      "position": [650, 900]
+    },
+    {
+      "parameters": {
+        "authentication": "twilioApi",
+        "operation": "send",
+        "to": "{{$node['Get Recent Appointments'].json['description']}}",
+        "message": "{{$node['Generate Follow-Up'].json['message']}}"
+      },
+      "name": "Send Follow-Up",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [850, 900]
+    }
+  ],
+  "connections": {
+    "Twilio Trigger": {
+      "main": [[{ "node": "IF Confirmation", "type": "main", "index": 0 }]]
+    },
+    "IF Confirmation": {
+      "main": [
+        [{ "node": "Forward to Confirmation", "type": "main", "index": 0 }],
+        [{ "node": "Parse Request", "type": "main", "index": 0 }]
+      ]
+    },
+    "Parse Request": {
+      "main": [[{ "node": "Check Availability", "type": "main", "index": 0 }]]
+    },
+    "Check Availability": {
+      "main": [[{ "node": "IF Slot Free", "type": "main", "index": 0 }]]
+    },
+    "IF Slot Free": {
+      "main": [
+        [{ "node": "Book Appointment", "type": "main", "index": 0 }],
+        [{ "node": "Find Slots", "type": "main", "index": 0 }]
+      ]
+    },
+    "Find Slots": {
+      "main": [[{ "node": "Send Slot Options", "type": "main", "index": 0 }]]
+    },
+    "Schedule Reminder": {
+      "main": [[{ "node": "Get Upcoming Appointments", "type": "main", "index": 0 }]]
+    },
+    "Get Upcoming Appointments": {
+      "main": [[{ "node": "Send Reminder", "type": "main", "index": 0 }]]
+    },
+    "Schedule Follow-Up": {
+      "main": [[{ "node": "Get Recent Appointments", "type": "main", "index": 0 }]]
+    },
+    "Get Recent Appointments": {
+      "main": [[{ "node": "Generate Follow-Up", "type": "main", "index": 0 }]]
+    },
+    "Generate Follow-Up": {
+      "main": [[{ "node": "Send Follow-Up", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "timezone": "Asia/Kolkata"
+  }
+}

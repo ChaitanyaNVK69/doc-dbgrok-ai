@@ -1,0 +1,90 @@
+{
+  "name": "Doctor Appointment Confirmation",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "twilioApi",
+        "event": "incomingMessage",
+        "phoneNumber": "whatsapp:+13343732835"
+      },
+      "name": "Twilio Trigger",
+      "type": "n8n-nodes-base.twilioTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "openAIApi",
+        "operation": "chat",
+        "model": "gpt-4",
+        "prompt": "Extract the chosen time from this message: {{$node['Twilio Trigger'].json['Body']}}. Output JSON with `time` (e.g., \"15:00\")."
+      },
+      "name": "Parse Confirmation",
+      "type": "n8n-nodes-base.openAI",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "googleCalendarOAuth2",
+        "operation": "create",
+        "calendar": "hr.bglr@gmail.com",
+        "startDateTime": "{{DateTime.fromISO('2025-05-27T' + $node['Parse Confirmation'].json['time']).toISO()}}",
+        "endDateTime": "{{DateTime.fromISO('2025-05-27T' + $node['Parse Confirmation'].json['time']).plus({minutes: 30}).toISO()}}",
+        "summary": "Appointment with Patient",
+        "description": "{{$node['Twilio Trigger'].json['From']}}"
+      },
+      "name": "Confirm Appointment",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "googleSheetsOAuth2",
+        "operation": "append",
+        "sheetId": "{{YOUR_SHEET_ID}}",
+        "values": {
+          "Name": "Patient",
+          "Phone": "{{$node['Twilio Trigger'].json['From']}}",
+          "Date": "2025-05-27",
+          "Time": "{{$node['Parse Confirmation'].json['time']}}",
+          "Event ID": "{{$node['Confirm Appointment'].json['id']}}"
+        }
+      },
+      "name": "Log to Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "twilioApi",
+        "operation": "send",
+        "to": "{{$node['Twilio Trigger'].json['From']}}",
+        "message": "Appointment confirmed for 2025-05-27 at {{$node['Parse Confirmation'].json['time']}}. We’ll remind you 24 hours before."
+      },
+      "name": "Send Confirmation",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [1050, 300]
+    }
+  ],
+  "connections": {
+    "Twilio Trigger": {
+      "main": [[{ "node": "Parse Confirmation", "type": "main", "index": 0 }]]
+    },
+    "Parse Confirmation": {
+      "main": [[{ "node": "Confirm Appointment", "type": "main", "index": 0 }]]
+    },
+    "Confirm Appointment": {
+      "main": [[{ "node": "Log to Sheets", "type": "main", "index": 0 }]]
+    },
+    "Log to Sheets": {
+      "main": [[{ "node": "Send Confirmation", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "timezone": "Asia/Kolkata"
+  }
+}
